@@ -566,6 +566,194 @@ export interface PurchaseRequest {
   note?: string;
 }
 
+// ── Fit ───────────────────────────────────────────────────────────────────────
+
+export type WorkoutType =
+  | 'GYM' | 'RUNNING' | 'CYCLING' | 'SWIMMING'
+  | 'WALKING' | 'YOGA' | 'HIIT' | 'FUNCTIONAL' | 'OTHER';
+
+export type WorkoutStatus = 'PLANNED' | 'COMPLETED' | 'SKIPPED';
+export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'ACTIVE' | 'VERY_ACTIVE';
+export type BiologicalSex = 'MALE' | 'FEMALE' | 'OTHER';
+
+export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
+  GYM:        'Academia',
+  RUNNING:    'Corrida',
+  CYCLING:    'Ciclismo',
+  SWIMMING:   'Natação',
+  WALKING:    'Caminhada',
+  YOGA:       'Yoga',
+  HIIT:       'HIIT',
+  FUNCTIONAL: 'Funcional',
+  OTHER:      'Outro',
+};
+
+export const WORKOUT_TYPE_ICONS: Record<WorkoutType, string> = {
+  GYM: '🏋️', RUNNING: '🏃', CYCLING: '🚴', SWIMMING: '🏊',
+  WALKING: '🚶', YOGA: '🧘', HIIT: '⚡', FUNCTIONAL: '🤸', OTHER: '💪',
+};
+
+export const WORKOUT_STATUS_LABELS: Record<WorkoutStatus, string> = {
+  PLANNED:   'Planejado',
+  COMPLETED: 'Concluído',
+  SKIPPED:   'Pulado',
+};
+
+export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
+  SEDENTARY:  'Sedentário',
+  LIGHT:      'Leve',
+  MODERATE:   'Moderado',
+  ACTIVE:     'Ativo',
+  VERY_ACTIVE: 'Muito ativo',
+};
+
+export const BIOLOGICAL_SEX_LABELS: Record<BiologicalSex, string> = {
+  MALE:   'Masculino',
+  FEMALE: 'Feminino',
+  OTHER:  'Outro',
+};
+
+export interface FitProfileResponse {
+  id: number;
+  userId: number;
+  userName: string;
+  heightCm: number | null;
+  weightKg: number | null;
+  targetWeightKg: number | null;
+  birthDate: string | null;
+  age: number | null;
+  biologicalSex: BiologicalSex | null;
+  activityLevel: ActivityLevel | null;
+  bmi: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FitProfileRequest {
+  heightCm?: number;
+  weightKg?: number;
+  targetWeightKg?: number;
+  birthDate?: string;
+  biologicalSex?: BiologicalSex;
+  activityLevel?: ActivityLevel;
+}
+
+export interface BodyMeasurementResponse {
+  id: number;
+  userId: number;
+  date: string;
+  weightKg: number | null;
+  bodyFatPercentage: number | null;
+  muscleMassKg: number | null;
+  waistCm: number | null;
+  chestCm: number | null;
+  hipsCm: number | null;
+  leftArmCm: number | null;
+  rightArmCm: number | null;
+  leftThighCm: number | null;
+  rightThighCm: number | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface BodyMeasurementRequest {
+  date: string;
+  weightKg?: number;
+  bodyFatPercentage?: number;
+  muscleMassKg?: number;
+  waistCm?: number;
+  chestCm?: number;
+  hipsCm?: number;
+  leftArmCm?: number;
+  rightArmCm?: number;
+  leftThighCm?: number;
+  rightThighCm?: number;
+  note?: string;
+}
+
+export interface WorkoutExerciseResponse {
+  id: number;
+  name: string;
+  sets: number | null;
+  reps: number | null;
+  weightKg: number | null;
+  durationSeconds: number | null;
+  restSeconds: number | null;
+  exerciseOrder: number;
+  note: string | null;
+}
+
+export interface WorkoutExerciseRequest {
+  name: string;
+  sets?: number;
+  reps?: number;
+  weightKg?: number;
+  durationSeconds?: number;
+  restSeconds?: number;
+  exerciseOrder?: number;
+  note?: string;
+}
+
+export interface WorkoutResponse {
+  id: number;
+  name: string;
+  type: WorkoutType;
+  typeLabel: string;
+  date: string;
+  startTime: string | null;
+  durationMinutes: number | null;
+  status: WorkoutStatus;
+  caloriesBurned: number | null;
+  heartRateAvg: number | null;
+  distanceKm: number | null;
+  pace: string | null;
+  note: string | null;
+  exercises: WorkoutExerciseResponse[];
+  ownerId: number;
+  ownerName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkoutRequest {
+  name: string;
+  type: WorkoutType;
+  date: string;
+  startTime?: string;
+  durationMinutes?: number;
+  caloriesBurned?: number;
+  heartRateAvg?: number;
+  distanceKm?: number;
+  pace?: string;
+  note?: string;
+  exercises?: WorkoutExerciseRequest[];
+}
+
+export interface WorkoutUpdateRequest {
+  name: string;
+  type: WorkoutType;
+  date: string;
+  status: WorkoutStatus;
+  startTime?: string;
+  durationMinutes?: number;
+  caloriesBurned?: number;
+  heartRateAvg?: number;
+  distanceKm?: number;
+  pace?: string;
+  note?: string;
+}
+
+export interface WorkoutSummaryResponse {
+  totalWorkoutsThisMonth: number;
+  totalWorkoutsLastMonth: number;
+  totalMinutesThisMonth: number;
+  totalCaloriesThisMonth: number;
+  totalDistanceKmThisMonth: number;
+  currentStreak: number;
+  byType: Partial<Record<WorkoutType, number>>;
+  nextPlanned: WorkoutResponse | null;
+}
+
 // ── Reports ───────────────────────────────────────────────────────────────────
 
 export interface MonthlySummaryResponse {

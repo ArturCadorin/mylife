@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BarChart3, Dumbbell, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -41,28 +42,29 @@ const SOLUTIONS: Solution[] = [
     Icon: Dumbbell,
     gradient: 'from-orange-500 to-red-500',
     shadow: 'shadow-orange-300/40 dark:shadow-orange-900/50',
-    href: 'http://localhost:3001',
+    href: '/fit/dashboard',
     currentApp: false,
   },
 ];
-
-/** Which product is running right now — change this per-app */
-const CURRENT_PRODUCT: ProductType = 'FINANCE';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SolutionSwitcher() {
   const { user } = useAuth();
   const { state } = useSidebar();
+  const pathname = usePathname();
   const collapsed = state === 'collapsed';
 
   const [open, setOpen] = useState(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Detecta produto ativo pelo pathname
+  const currentProduct: ProductType = pathname.startsWith('/fit/') ? 'FITNESS' : 'FINANCE';
+
   // Mostra todas as soluções do ecossistema — o array products do usuário indica
   // o que ele já ativou, mas o switcher exibe tudo disponível no ecossistema.
   const userProducts = new Set(user?.products ?? []);
-  const current = SOLUTIONS.find((s) => s.product === CURRENT_PRODUCT) ?? SOLUTIONS[0];
+  const current = SOLUTIONS.find((s) => s.product === currentProduct) ?? SOLUTIONS[0];
   const hasSwitcher = SOLUTIONS.length > 1;
 
   function enter() {
@@ -144,7 +146,7 @@ export function SolutionSwitcher() {
               <SolutionCard
                 key={solution.product}
                 solution={solution}
-                isCurrent={solution.product === CURRENT_PRODUCT}
+                isCurrent={solution.product === currentProduct}
                 hasAccess={userProducts.has(solution.product)}
                 onSelect={() => setOpen(false)}
               />
@@ -219,15 +221,6 @@ function SolutionCard({
   // No access yet — not clickable
   if (!hasAccess) {
     return <div>{inner}</div>;
-  }
-
-  // External app (different port / domain)
-  if (solution.href.startsWith('http')) {
-    return (
-      <a href={solution.href} onClick={onSelect} rel="noopener noreferrer">
-        {inner}
-      </a>
-    );
   }
 
   return (

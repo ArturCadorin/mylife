@@ -48,23 +48,34 @@ mylife-web/src/
 │   │   ├── wishlist/page.tsx
 │   │   ├── reports/page.tsx
 │   │   └── ui-demo/page.tsx
+│   ├── (fit)/                   ← Grupo de rotas myFit
+│   │   ├── layout.tsx           ← Guard de autenticação + FitSidebar
+│   │   └── fit/
+│   │       ├── page.tsx         ← Redireciona para /fit/dashboard
+│   │       ├── dashboard/page.tsx
+│   │       ├── workouts/page.tsx
+│   │       ├── workouts/[id]/page.tsx
+│   │       ├── profile/page.tsx
+│   │       └── measurements/page.tsx
 │   └── (auth)/                  ← Grupo de rotas públicas
 │       ├── layout.tsx
 │       ├── login/page.tsx
 │       └── register/page.tsx
 ├── components/
 │   ├── ui/                      ← Design system (20+ componentes base)
-│   ├── layout/                  ← Header, Sidebar, FamilyGroupDialog
+│   ├── layout/                  ← Header, Sidebars (AppSidebar + FitSidebar), SolutionSwitcher
 │   ├── transactions/            ← TransactionSheet
 │   ├── accounts/                ← AccountSheet + BankSelector
 │   ├── credit-cards/            ← CardSheet + NetworkSelector
 │   ├── savings/                 ← SavingsSheet + EntrySheet
 │   ├── investments/             ← InvestmentSheet + EntrySheet
-│   └── wishlist/                ← WishlistSheet + PurchaseSheet
+│   ├── wishlist/                ← WishlistSheet + PurchaseSheet
+│   └── fit/                     ← WorkoutSheet + ProfileSheet + MeasurementSheet
 ├── hooks/
 │   ├── use-auth.ts              ← Login, register, logout
 │   ├── use-family-group.ts      ← Criação de grupo familiar
-│   ├── use-finance.ts           ← 70+ funções para todos os domínios
+│   ├── use-finance.ts           ← 70+ funções para todos os domínios Finance
+│   ├── use-fit.ts               ← Todos os hooks do módulo myFit
 │   └── use-mobile.ts            ← Detecção de breakpoint mobile
 ├── lib/
 │   ├── api.ts                   ← Instância Axios + interceptors
@@ -747,3 +758,147 @@ qc.invalidateQueries({ queryKey: ['finance', 'overview'] });
 | Investimentos | `['finance', 'investments']` |
 | Lista de desejos | `['finance', 'wishlist']` |
 | Relatórios mensais | `['finance', 'reports', 'monthly', month]` |
+
+---
+
+## 14. Módulo myFit
+
+### Visão Geral
+
+O módulo myFit é o segundo produto do ecossistema myLife. Roda no **mesmo** Next.js que o myFinance, sob o route group `(fit)/`, com URLs `/fit/*`.
+
+**Separação de rotas:**
+- `(app)/` → myFinance (`/dashboard`, `/transactions`, …)
+- `(fit)/` → myFit (`/fit/dashboard`, `/fit/workouts`, …)
+- `(auth)/` → compartilhado (login, register)
+
+O `SolutionSwitcher` na sidebar detecta automaticamente o produto ativo via `usePathname()`.
+
+---
+
+### Estrutura de Pastas (myFit)
+
+```
+src/
+├── app/(fit)/
+│   ├── layout.tsx                    ← Guard de autenticação + FitSidebar
+│   └── fit/
+│       ├── page.tsx                  ← Redireciona para /fit/dashboard
+│       ├── dashboard/page.tsx        ← Resumo mensal, StatCards, próximo treino
+│       ├── workouts/
+│       │   ├── page.tsx              ← Lista de treinos com filtros
+│       │   └── [id]/page.tsx         ← Detalhe do treino + exercícios
+│       ├── profile/page.tsx          ← Perfil físico + IMC + última medição
+│       └── measurements/page.tsx     ← Histórico de medidas corporais
+├── components/fit/
+│   ├── workout-sheet.tsx             ← Criar/editar treino (tint=amber)
+│   ├── profile-sheet.tsx             ← Editar perfil físico (tint=sky)
+│   └── measurement-sheet.tsx         ← Registrar medidas corporais (tint=violet)
+├── components/layout/
+│   └── fit-sidebar.tsx               ← Sidebar exclusiva do myFit
+└── hooks/
+    └── use-fit.ts                    ← Todos os hooks do módulo myFit
+```
+
+---
+
+### Tipos myFit (`src/types/api.ts`)
+
+| Tipo | Valores |
+|------|---------|
+| `WorkoutType` | `GYM \| RUNNING \| CYCLING \| SWIMMING \| WALKING \| YOGA \| HIIT \| FUNCTIONAL \| OTHER` |
+| `WorkoutStatus` | `PLANNED \| COMPLETED \| SKIPPED` |
+| `ActivityLevel` | `SEDENTARY \| LIGHT \| MODERATE \| ACTIVE \| VERY_ACTIVE` |
+| `BiologicalSex` | `MALE \| FEMALE \| OTHER` |
+
+| Interface | Campos Principais |
+|-----------|------------------|
+| `FitProfileResponse` | `id`, `userId`, `heightCm`, `weightKg`, `targetWeightKg`, `birthDate`, `age`, `biologicalSex`, `activityLevel`, `bmi` |
+| `FitProfileRequest` | `heightCm?`, `weightKg?`, `targetWeightKg?`, `birthDate?`, `biologicalSex?`, `activityLevel?` |
+| `BodyMeasurementResponse` | `id`, `userId`, `date`, `weightKg`, `bodyFatPercentage`, `muscleMassKg`, `waistCm`, `chestCm`, `hipsCm`, `leftArmCm`, `rightArmCm`, `leftThighCm`, `rightThighCm`, `note` |
+| `WorkoutResponse` | `id`, `name`, `type`, `typeLabel`, `date`, `startTime`, `durationMinutes`, `status`, `caloriesBurned`, `heartRateAvg`, `distanceKm`, `pace`, `note`, `exercises[]`, `ownerId` |
+| `WorkoutRequest` | `name`, `type`, `date`, `startTime?`, `durationMinutes?`, `caloriesBurned?`, `heartRateAvg?`, `distanceKm?`, `pace?`, `note?`, `exercises?[]` |
+| `WorkoutUpdateRequest` | `name`, `type`, `date`, `status`, `startTime?`, `durationMinutes?`, `caloriesBurned?`, `heartRateAvg?`, `distanceKm?`, `pace?`, `note?` |
+| `WorkoutExerciseResponse` | `id`, `name`, `sets`, `reps`, `weightKg`, `durationSeconds`, `restSeconds`, `exerciseOrder` |
+| `WorkoutSummaryResponse` | `totalWorkoutsThisMonth`, `totalWorkoutsLastMonth`, `totalMinutesThisMonth`, `totalCaloriesThisMonth`, `totalDistanceKmThisMonth`, `currentStreak`, `byType{}`, `nextPlanned` |
+
+**Labels / Icons disponíveis:**
+- `WORKOUT_TYPE_LABELS`, `WORKOUT_TYPE_ICONS`, `WORKOUT_STATUS_LABELS`
+- `ACTIVITY_LEVEL_LABELS`, `BIOLOGICAL_SEX_LABELS`
+
+---
+
+### Hooks myFit (`src/hooks/use-fit.ts`)
+
+#### Perfil
+| Hook | Endpoint | Query Key |
+|------|----------|-----------|
+| `useFitProfile()` | `GET /fit/profile` | `['fit', 'profile']` |
+| `useUpsertFitProfile()` | `PUT /fit/profile` | invalida `['fit', 'profile']` |
+
+> `GET /fit/profile` cria automaticamente um perfil vazio se não existir (padrão getOrCreate).
+
+#### Medidas Corporais
+| Hook | Endpoint | Query Key |
+|------|----------|-----------|
+| `useBodyMeasurements(page, size)` | `GET /fit/measurements?page=&size=&sort=date,desc` | `['fit', 'measurements', page]` |
+| `useCreateMeasurement()` | `POST /fit/measurements` | invalida `['fit', 'measurements']`, `['fit', 'profile']` |
+| `useDeleteMeasurement()` | `DELETE /fit/measurements/{id}` | invalida `['fit', 'measurements']` |
+
+#### Treinos
+| Hook | Endpoint | Query Key |
+|------|----------|-----------|
+| `useWorkouts(filters)` | `GET /fit/workouts?...` | `['fit', 'workouts', filters]` |
+| `useWorkout(id)` | `GET /fit/workouts/{id}` | `['fit', 'workouts', id]` |
+| `useWorkoutSummary()` | `GET /fit/workouts/summary` | `['fit', 'workouts', 'summary']` |
+| `useCreateWorkout()` | `POST /fit/workouts` | invalida `['fit', 'workouts']` |
+| `useUpdateWorkout()` | `PUT /fit/workouts/{id}` | invalida `['fit', 'workouts']` |
+| `useCompleteWorkout()` | `PATCH /fit/workouts/{id}/complete` | invalida `['fit', 'workouts']` |
+| `useSkipWorkout()` | `PATCH /fit/workouts/{id}/skip` | invalida `['fit', 'workouts']` |
+| `useDeleteWorkout()` | `DELETE /fit/workouts/{id}` | invalida `['fit', 'workouts']` |
+
+#### Exercícios
+| Hook | Endpoint |
+|------|----------|
+| `useAddExercise()` | `POST /fit/workouts/{workoutId}/exercises` |
+| `useUpdateExercise()` | `PUT /fit/workouts/{workoutId}/exercises/{id}` |
+| `useDeleteExercise()` | `DELETE /fit/workouts/{workoutId}/exercises/{id}` |
+
+---
+
+### Rotas myFit
+
+O layout `(fit)/layout.tsx` usa `FitSidebar` e tem o mesmo guard de autenticação do `(app)/layout.tsx`.
+
+| Rota | Arquivo | O que exibe |
+|------|---------|-------------|
+| `/fit` | `fit/page.tsx` | Redireciona para `/fit/dashboard` |
+| `/fit/dashboard` | `fit/dashboard/page.tsx` | Hero banner, 4 StatCards (treinos, minutos, calorias, sequência), próximo treino planejado, distribuição por tipo, resumo do perfil físico |
+| `/fit/workouts` | `fit/workouts/page.tsx` | Lista paginada de treinos com filtros de tipo e status; ações: concluir, pular, editar, excluir, ver detalhe |
+| `/fit/workouts/[id]` | `fit/workouts/[id]/page.tsx` | Hero do treino, 4 stat cards (duração, calorias, distância, FC), lista de exercícios com inline add, ações de status |
+| `/fit/profile` | `fit/profile/page.tsx` | IMC hero, cards de medidas e dados pessoais, última medição corporal |
+| `/fit/measurements` | `fit/measurements/page.tsx` | Histórico de medidas paginado (15/página) com detalhe de composição + circunferências |
+
+---
+
+### Sheets myFit
+
+| Sheet | Arquivo | Tint | Modo edição |
+|-------|---------|------|-------------|
+| `WorkoutSheet` | `fit/workout-sheet.tsx` | amber | Sim (prop `workout?`); exibe campo Status; sem seção Exercícios inline |
+| `ProfileSheet` | `fit/profile-sheet.tsx` | sky | Sempre (upsert) via prop `profile?` |
+| `MeasurementSheet` | `fit/measurement-sheet.tsx` | violet | Apenas criação |
+
+**WorkoutSheet — campos condicionais:**
+- Distância + Pace: exibidos apenas para `RUNNING`, `CYCLING`, `SWIMMING`, `WALKING`
+- Exercícios inline (no create): exibidos apenas para `GYM`, `FUNCTIONAL`, `HIIT`
+
+---
+
+### SolutionSwitcher
+
+`components/layout/solution-switcher.tsx` detecta o produto ativo por `pathname`:
+```typescript
+const currentProduct: ProductType = pathname.startsWith('/fit/') ? 'FITNESS' : 'FINANCE';
+```
+Não há constante hardcoded — a detecção é automática. Ao navegar entre `/fit/*` e as rotas do Finance, o switcher atualiza o logo e o produto ativo automaticamente.
