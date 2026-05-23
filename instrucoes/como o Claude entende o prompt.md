@@ -1,0 +1,12 @@
+Bloco 1 — Papel e contexto
+    É o primeiro que o Claude lê e define o "tom" de toda a sessão. A linha Você é um engenheiro sênior... instrui o modelo a assumir um perfil técnico e opinar, não só executar. Se um dia você quiser um perfil diferente (ex: foco em segurança, ou em performance), é aqui que muda. A estrutura de pastas em código delimitado (```) é lida como arquitetura de referência — o Claude usará ela para decidir em qual pacote criar cada arquivo.
+Bloco 2 — Stack
+    É o bloco mais consultado durante geração de código. Toda vez que o Claude for escolher uma biblioteca, um padrão ou uma versão, ele volta aqui. Se você trocar H2 por PostgreSQL em dev, atualize aqui — senão o Claude continuará gerando configurações H2. As convenções de código (inglês/português, arquitetura em camadas) são lidas como regras fixas que valem para toda entrega.
+Bloco 3 — Domínio e entidades
+    O mais importante e o que mais vai crescer. O Claude usa este bloco para entender relacionamentos entre entidades e não inventar campos que não existem no seu modelo. As subseções 3.1, 3.2, 3.3 ensinam ao Claude que User vive no core e não no finance — isso evita que ele acople código errado. Os itens [ ] nas evoluções futuras são lidos como backlog — o Claude os respeita e não implementa por conta própria.
+Bloco 4 — Padrões de resposta
+    Define o contrato de entrega. O Claude lê isso como checklist antes de responder — por isso ele vai sempre incluir DTO + teste quando gerar um endpoint. Se quiser mudar o envelope de resposta da API, é aqui. Se quiser que ele pare de gerar testes unitários em alguma fase, basta remover ou comentar a linha correspondente.
+Bloco 5 — Estado do projeto
+    Funciona como memória de progresso. O Claude Code não tem memória entre sessões, então esta tabela diz a ele o que já existe e o que não existe ainda. Atualize o emoji a cada módulo concluído: ⏳ pendente → 🔧 em andamento → ✅ concluído. Isso evita que ele reimplemente algo que já está pronto.
+Bloco 6 — Feature em andamento
+    É o único bloco que muda a cada sessão. Pense nele como o briefing do dia. Quanto mais específico você for aqui — especialmente no campo "Arquivos relevantes já existentes" — menos contexto o Claude precisará reconstruir e mais preciso será o código gerado. No Claude Code, você pode inclusive referenciar os arquivos reais do projeto junto com este bloco.

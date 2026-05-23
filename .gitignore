@@ -1,0 +1,66 @@
+# ─── Sistema operacional ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDEs ────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BACKEND — Spring Boot / Maven
+# ══════════════════════════════════════════════════════════════════════════════
+mylife-backend/**/target/
+mylife-backend/**/*.class
+mylife-backend/**/*.jar
+mylife-backend/**/*.war
+
+# Banco H2 em arquivo (dados de desenvolvimento — não vão ao repo)
+mylife-backend/**/data/
+mylife-backend/**/*.mv.db
+mylife-backend/**/*.trace.db
+
+# Configurações locais sensíveis
+mylife-backend/**/application-local.properties
+mylife-backend/**/application-prod.properties
+mylife-backend/**/*.p12
+mylife-backend/**/*.jks
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FRONTEND — Next.js / Node
+# ══════════════════════════════════════════════════════════════════════════════
+mylife-web/node_modules/
+mylife-web/.next/
+mylife-web/out/
+mylife-web/.vercel/
+
+# Build outputs
+mylife-web/build/
+mylife-web/dist/
+
+# Variáveis de ambiente — NUNCA subir ao repo
+mylife-web/.env
+mylife-web/.env.local
+mylife-web/.env.development.local
+mylife-web/.env.test.local
+mylife-web/.env.production.local
+
+# Gerado automaticamente pelo Next.js
+mylife-web/next-env.d.ts
+
+# Cache de ferramentas
+mylife-web/.eslintcache
+mylife-web/.turbo/
+mylife-web/tsconfig.tsbuildinfo
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
