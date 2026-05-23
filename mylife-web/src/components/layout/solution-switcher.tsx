@@ -32,7 +32,7 @@ const SOLUTIONS: Solution[] = [
     Icon: BarChart3,
     gradient: 'from-emerald-500 to-teal-500',
     shadow: 'shadow-emerald-300/40 dark:shadow-emerald-900/50',
-    href: '/dashboard',
+    href: '/finance/dashboard',
     currentApp: true,
   },
   {
@@ -60,6 +60,7 @@ export function SolutionSwitcher() {
 
   // Detecta produto ativo pelo pathname
   const currentProduct: ProductType = pathname.startsWith('/fit/') ? 'FITNESS' : 'FINANCE';
+  // Finance detectado por /finance/* ou por qualquer rota que não seja /fit/*
 
   // Mostra todas as soluções do ecossistema — o array products do usuário indica
   // o que ele já ativou, mas o switcher exibe tudo disponível no ecossistema.

@@ -239,7 +239,7 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="space-y-6">
       {/* Back */}
-      <Link href="/credit-cards" className={buttonVariants({ variant: "ghost", size: "sm", className: "text-slate-500 -ml-2" })}><ArrowLeft className="h-4 w-4 mr-1" />Cartões</Link>
+      <Link href="/finance/credit-cards" className={buttonVariants({ variant: "ghost", size: "sm", className: "text-slate-500 -ml-2" })}><ArrowLeft className="h-4 w-4 mr-1" />Cartões</Link>
 
       {/* Card header */}
       {cardLoading ? (

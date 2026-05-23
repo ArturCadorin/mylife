@@ -7,15 +7,19 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
 
 const pageTitles: Record<string, { title: string; emoji: string }> = {
-  '/dashboard':    { title: 'Dashboard',         emoji: '🏠' },
-  '/transactions': { title: 'Transações',         emoji: '💸' },
-  '/accounts':     { title: 'Contas',             emoji: '🏦' },
-  '/credit-cards': { title: 'Cartões de Crédito', emoji: '💳' },
-  '/savings':      { title: 'Cofrinhos',          emoji: '🐷' },
-  '/investments':  { title: 'Investimentos',      emoji: '📈' },
-  '/wishlist':     { title: 'Lista de Desejos',   emoji: '⭐' },
-  '/reports':      { title: 'Relatórios',         emoji: '📊' },
-  '/settings':     { title: 'Configurações',       emoji: '⚙️' },
+  '/finance/dashboard':    { title: 'Dashboard',         emoji: '🏠' },
+  '/finance/transactions': { title: 'Transações',         emoji: '💸' },
+  '/finance/accounts':     { title: 'Contas',             emoji: '🏦' },
+  '/finance/credit-cards': { title: 'Cartões de Crédito', emoji: '💳' },
+  '/finance/savings':      { title: 'Cofrinhos',          emoji: '🐷' },
+  '/finance/investments':  { title: 'Investimentos',      emoji: '📈' },
+  '/finance/wishlist':     { title: 'Lista de Desejos',   emoji: '⭐' },
+  '/finance/reports':      { title: 'Relatórios',         emoji: '📊' },
+  '/settings':             { title: 'Configurações',       emoji: '⚙️' },
+  '/fit/dashboard':        { title: 'Dashboard Fit',       emoji: '🏋️' },
+  '/fit/workouts':         { title: 'Meus Treinos',        emoji: '💪' },
+  '/fit/profile':          { title: 'Perfil Físico',       emoji: '🧬' },
+  '/fit/measurements':     { title: 'Medidas Corporais',   emoji: '📏' },
 };
 
 export function SiteHeader() {

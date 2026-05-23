@@ -22,28 +22,28 @@ import { useAuth } from '@/hooks/use-auth';
 const navGroups = [
   {
     label: 'Início',
-    items: [{ label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' }],
+    items: [{ label: 'Dashboard', icon: LayoutDashboard, href: '/finance/dashboard' }],
   },
   {
     label: 'Finanças',
     items: [
-      { label: 'Transações', icon: ArrowLeftRight, href: '/transactions' },
-      { label: 'Contas', icon: Building2, href: '/accounts' },
-      { label: 'Cartões', icon: CreditCard, href: '/credit-cards' },
+      { label: 'Transações', icon: ArrowLeftRight, href: '/finance/transactions' },
+      { label: 'Contas', icon: Building2, href: '/finance/accounts' },
+      { label: 'Cartões', icon: CreditCard, href: '/finance/credit-cards' },
     ],
   },
   {
     label: 'Patrimônio',
     items: [
-      { label: 'Cofrinhos', icon: PiggyBank, href: '/savings' },
-      { label: 'Investimentos', icon: TrendingUp, href: '/investments' },
+      { label: 'Cofrinhos', icon: PiggyBank, href: '/finance/savings' },
+      { label: 'Investimentos', icon: TrendingUp, href: '/finance/investments' },
     ],
   },
   {
     label: 'Outros',
     items: [
-      { label: 'Lista de desejos', icon: Heart, href: '/wishlist' },
-      { label: 'Relatórios', icon: BarChart3, href: '/reports' },
+      { label: 'Lista de desejos', icon: Heart, href: '/finance/wishlist' },
+      { label: 'Relatórios', icon: BarChart3, href: '/finance/reports' },
     ],
   },
 ];

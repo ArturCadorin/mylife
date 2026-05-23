@@ -102,10 +102,10 @@ export default function DashboardPage() {
 
   /* ── ações rápidas ── */
   const quickActions = [
-    { label: 'Nova receita',  href: '/transactions?type=INCOME',   bg: 'from-emerald-500 to-teal-500',   Icon: ArrowDownLeft  },
-    { label: 'Nova despesa',  href: '/transactions?type=EXPENSE',  bg: 'from-rose-500 to-pink-500',      Icon: ArrowUpRight   },
-    { label: 'Transferência', href: '/transactions?type=TRANSFER', bg: 'from-blue-500 to-indigo-500',    Icon: ArrowLeftRight },
-    { label: 'Ver contas',   href: '/accounts',                   bg: 'from-slate-400 to-slate-600 dark:from-slate-600 dark:to-slate-700', Icon: Wallet },
+    { label: 'Nova receita',  href: '/finance/transactions?type=INCOME',   bg: 'from-emerald-500 to-teal-500',   Icon: ArrowDownLeft  },
+    { label: 'Nova despesa',  href: '/finance/transactions?type=EXPENSE',  bg: 'from-rose-500 to-pink-500',      Icon: ArrowUpRight   },
+    { label: 'Transferência', href: '/finance/transactions?type=TRANSFER', bg: 'from-blue-500 to-indigo-500',    Icon: ArrowLeftRight },
+    { label: 'Ver contas',   href: '/finance/accounts',                   bg: 'from-slate-400 to-slate-600 dark:from-slate-600 dark:to-slate-700', Icon: Wallet },
   ] as const;
 
   return (
@@ -122,7 +122,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <Link
-          href="/transactions"
+          href="/finance/transactions"
           className={buttonVariants({ size: 'sm', className: 'shrink-0 gap-1.5 rounded-xl shadow-sm shadow-emerald-200 dark:shadow-emerald-900/40' })}
         >
           <Plus className="h-4 w-4" />
@@ -200,7 +200,7 @@ export default function DashboardPage() {
                 <CardTitle>Transações recentes</CardTitle>
               </div>
               <Link
-                href="/transactions"
+                href="/finance/transactions"
                 className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1 -mr-2 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400' })}
               >
                 Ver todas <ArrowRight className="h-3.5 w-3.5" />
@@ -279,7 +279,7 @@ export default function DashboardPage() {
                   </div>
                   <CardTitle>Cofrinhos</CardTitle>
                 </div>
-                <Link href="/savings"
+                <Link href="/finance/savings"
                   className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1 -mr-2 text-xs text-violet-600 dark:text-violet-400' })}
                 >
                   Ver <ArrowRight className="h-3.5 w-3.5" />
@@ -335,7 +335,7 @@ export default function DashboardPage() {
                 </div>
                 <CardTitle>Contas</CardTitle>
               </div>
-              <Link href="/accounts"
+              <Link href="/finance/accounts"
                 className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1 -mr-2 text-xs text-sky-600 dark:text-sky-400' })}
               >
                 Ver todas <ArrowRight className="h-3.5 w-3.5" />

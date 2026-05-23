@@ -68,7 +68,7 @@ export default function SavingsDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-6">
       {/* Back */}
-      <Link href="/savings" className={buttonVariants({ variant: "ghost", size: "sm", className: "text-slate-500 -ml-2" })}><ArrowLeft className="h-4 w-4 mr-1" />Cofrinhos</Link>
+      <Link href="/finance/savings" className={buttonVariants({ variant: "ghost", size: "sm", className: "text-slate-500 -ml-2" })}><ArrowLeft className="h-4 w-4 mr-1" />Cofrinhos</Link>
 
       {/* Header card */}
       {savingsLoading ? (

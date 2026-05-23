@@ -42,7 +42,7 @@ export function useAuth() {
     localStorage.setItem(TOKEN_KEY, auth.token);
     localStorage.setItem(USER_KEY, JSON.stringify(auth));
     setUser(auth);
-    router.push('/dashboard');
+    router.push('/finance/dashboard');
     return auth;
   }, [router]);
 
@@ -52,7 +52,7 @@ export function useAuth() {
     localStorage.setItem(TOKEN_KEY, auth.token);
     localStorage.setItem(USER_KEY, JSON.stringify(auth));
     setUser(auth);
-    router.push('/dashboard');
+    router.push('/finance/dashboard');
     return auth;
   }, [router]);
 
