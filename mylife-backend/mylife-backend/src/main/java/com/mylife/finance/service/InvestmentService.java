@@ -163,18 +163,27 @@ public class InvestmentService {
 
         BigDecimal previousValue = investment.getCurrentValue();
 
+        // DEPOSIT e WITHDRAWAL devem ter valor > 0; YIELD_UPDATE pode ser zero (zerando o investimento)
+        if (request.getType() != InvestmentEntryType.YIELD_UPDATE
+                && request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Valor deve ser maior que zero.", HttpStatus.BAD_REQUEST);
+        }
+
         switch (request.getType()) {
             case DEPOSIT -> {
                 investment.setTotalInvested(investment.getTotalInvested().add(request.getAmount()));
                 investment.setCurrentValue(investment.getCurrentValue().add(request.getAmount()));
             }
             case WITHDRAWAL -> {
-                if (request.getAmount().compareTo(investment.getTotalInvested()) > 0) {
+                if (request.getAmount().compareTo(investment.getCurrentValue()) > 0) {
                     throw new BusinessException(
-                            "Valor de resgate excede o total investido.",
+                            String.format("Valor de resgate (R$ %.2f) excede o valor atual do investimento (R$ %.2f).",
+                                    request.getAmount(), investment.getCurrentValue()),
                             HttpStatus.UNPROCESSABLE_ENTITY);
                 }
-                investment.setTotalInvested(investment.getTotalInvested().subtract(request.getAmount()));
+                // Reduz o principal até zero, o restante é resgate de rendimento
+                BigDecimal principalReduction = request.getAmount().min(investment.getTotalInvested());
+                investment.setTotalInvested(investment.getTotalInvested().subtract(principalReduction));
                 investment.setCurrentValue(investment.getCurrentValue().subtract(request.getAmount()));
             }
             case YIELD_UPDATE -> {

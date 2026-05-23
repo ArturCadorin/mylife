@@ -88,10 +88,26 @@ public class AccountService {
     }
 
     @Transactional
+    public void reactivate(Long id, User authenticatedUser) {
+        User user = reloadUser(authenticatedUser);
+        Account account = findAccountOrThrow(id);
+        validateAccess(user, account);
+
+        account.setActive(true);
+        accountRepository.save(account);
+    }
+
+    @Transactional
     public void delete(Long id, User authenticatedUser) {
         User user = reloadUser(authenticatedUser);
         Account account = findAccountOrThrow(id);
         validateAccess(user, account);
+
+        if (account.getBalance().compareTo(java.math.BigDecimal.ZERO) != 0) {
+            throw new BusinessException(
+                    "Não é possível excluir uma conta com saldo. Transfira o saldo antes de excluir.",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
 
         accountRepository.delete(account);
     }

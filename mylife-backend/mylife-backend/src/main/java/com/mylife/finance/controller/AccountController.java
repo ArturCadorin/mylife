@@ -81,6 +81,15 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success(null, "Conta desativada com sucesso."));
     }
 
+    @Operation(summary = "Reativar conta previamente desativada")
+    @PatchMapping("/{id}/reactivate")
+    public ResponseEntity<ApiResponse<Void>> reactivate(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User user) {
+        accountService.reactivate(id, user);
+        return ResponseEntity.ok(ApiResponse.success(null, "Conta reativada com sucesso."));
+    }
+
     @Operation(summary = "Excluir conta")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(

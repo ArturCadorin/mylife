@@ -19,6 +19,18 @@ Token JWT: lido de `localStorage('mylife_token')` e injetado em todo request via
 **403** = backend reiniciado (H2 apagou o usuário) → usuário precisa logar novamente.  
 **401** = interceptor limpa localStorage + redireciona `/login` automaticamente.
 
+## Endpoints relevantes (verificados em testes)
+
+| Recurso | Endpoint correto |
+|---------|-----------------|
+| Grupo familiar do usuário | `GET /family-groups/me` (não `/my`) |
+| Compra no cartão | `POST /finance/credit-cards/{id}/transactions` (não `/purchases`) |
+| Relatório mensal | `GET /finance/reports/monthly-summary?month=YYYY-MM` |
+| Resumo por categoria | `GET /finance/reports/category-summary?month=YYYY-MM&type=EXPENSE` |
+| Comparativo mensal | `GET /finance/reports/monthly-comparison?month=YYYY-MM` |
+| Projeção recorrências | `GET /finance/reports/recurrence-projection` |
+| Evolução de conta | `GET /finance/reports/account-evolution/{id}?from=YYYY-MM-DD&to=YYYY-MM-DD` |
+
 ---
 
 ## Onde adicionar cada coisa

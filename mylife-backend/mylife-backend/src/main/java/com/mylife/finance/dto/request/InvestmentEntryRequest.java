@@ -1,8 +1,8 @@
 package com.mylife.finance.dto.request;
 
 import com.mylife.finance.domain.enums.InvestmentEntryType;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -15,7 +15,7 @@ public class InvestmentEntryRequest {
     private InvestmentEntryType type;
 
     @NotNull
-    @Positive
+    @DecimalMin(value = "0.0", message = "Valor não pode ser negativo.")
     private BigDecimal amount;
 
     @NotNull
