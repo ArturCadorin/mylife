@@ -25,7 +25,6 @@ import com.mylife.finance.repository.CreditCardRepository;
 import com.mylife.finance.repository.CreditCardTransactionRepository;
 import com.mylife.finance.repository.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -37,7 +36,9 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -158,11 +159,12 @@ public class CreditCardService {
                     HttpStatus.UNPROCESSABLE_ENTITY);
         }
 
-        // Base invoice month: today <= closingDay → current month, else next month
-        LocalDate today = LocalDate.now();
-        YearMonth baseMonth = today.getDayOfMonth() <= card.getClosingDay()
-                ? YearMonth.from(today)
-                : YearMonth.from(today).plusMonths(1);
+        // Base invoice month derived from purchase date:
+        // purchaseDate <= closingDay → same month, else next month
+        LocalDate purchaseDate = request.getPurchaseDate();
+        YearMonth baseMonth = purchaseDate.getDayOfMonth() <= card.getClosingDay()
+                ? YearMonth.from(purchaseDate)
+                : YearMonth.from(purchaseDate).plusMonths(1);
 
         int n = request.getTotalInstallments();
         BigDecimal installmentAmount = request.getTotalAmount()
@@ -203,15 +205,65 @@ public class CreditCardService {
         return toTransactionResponse(first);
     }
 
-    // ── Invoices ───────────────────────────────────────────────────────────────
-
-    @Transactional(readOnly = true)
-    public Page<InvoiceResponse> findInvoices(Long cardId, User authenticatedUser, Pageable pageable) {
+    @Transactional
+    public void deleteTransaction(Long cardId, Long transactionId, User authenticatedUser) {
         User user = reloadUser(authenticatedUser);
         CreditCard card = findCardOrThrow(cardId);
         validateCardAccess(user, card);
-        return invoiceRepository.findByCreditCard(card, pageable)
-                .map(inv -> toInvoiceResponse(inv, false));
+
+        CreditCardTransaction tx = creditCardTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new BusinessException("Transação não encontrada.", HttpStatus.NOT_FOUND));
+
+        if (!tx.getCreditCard().getId().equals(cardId)) {
+            throw new BusinessException("Transação não pertence a este cartão.", HttpStatus.FORBIDDEN);
+        }
+
+        if (tx.getInvoice().getStatus() == InvoiceStatus.PAID) {
+            throw new BusinessException(
+                    "Não é possível excluir lançamentos de faturas já pagas.", HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+
+        // Find all installments of this purchase (same card, description, amount, date, total)
+        List<CreditCardTransaction> allInstallments = creditCardTransactionRepository
+                .findAllInstallments(card, tx.getDescription(), tx.getTotalAmount(),
+                        tx.getPurchaseDate(), tx.getTotalInstallments());
+
+        // Only delete installments in non-PAID invoices
+        List<CreditCardTransaction> toDelete = allInstallments.stream()
+                .filter(t -> t.getInvoice().getStatus() != InvoiceStatus.PAID)
+                .toList();
+
+        // Accumulate invoice total deductions per invoice
+        Map<Long, Invoice> invoiceMap = new LinkedHashMap<>();
+        for (CreditCardTransaction t : toDelete) {
+            Invoice inv = t.getInvoice();
+            invoiceMap.putIfAbsent(inv.getId(), inv);
+            inv.setTotalAmount(inv.getTotalAmount().subtract(t.getInstallmentAmount()));
+        }
+
+        creditCardTransactionRepository.deleteAll(toDelete);
+
+        // Persist updated totals or delete invoices that became empty
+        for (Invoice inv : invoiceMap.values()) {
+            if (inv.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                invoiceRepository.delete(inv);
+            } else {
+                invoiceRepository.save(inv);
+            }
+        }
+    }
+
+    // ── Invoices ───────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<InvoiceResponse> findInvoices(Long cardId, User authenticatedUser) {
+        User user = reloadUser(authenticatedUser);
+        CreditCard card = findCardOrThrow(cardId);
+        validateCardAccess(user, card);
+        return invoiceRepository.findByCreditCardOrderByReferenceMonthDesc(card)
+                .stream()
+                .map(inv -> toInvoiceResponse(inv, false))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -325,7 +377,7 @@ public class CreditCardService {
                 .id(invoice.getId())
                 .creditCardId(invoice.getCreditCard().getId())
                 .creditCardName(invoice.getCreditCard().getName())
-                .referenceMonth(invoice.getReferenceMonth().format(YEAR_MONTH_FMT))
+                .yearMonth(invoice.getReferenceMonth().format(YEAR_MONTH_FMT))
                 .dueDate(invoice.getDueDate())
                 .totalAmount(invoice.getTotalAmount())
                 .status(invoice.getStatus())

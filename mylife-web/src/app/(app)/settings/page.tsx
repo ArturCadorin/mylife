@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import {
   User, Lock, Users, Plus, Trash2, Crown, Loader2,
-  ShieldCheck, UserPlus, LogOut,
+  ShieldCheck, UserPlus, LogOut, TriangleAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter,
+  DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/use-auth';
+import { useResetFinancialData } from '@/hooks/use-finance';
 import type { FamilyGroupResponse } from '@/types/api';
 import {
   useMyFamilyGroup,
@@ -84,6 +90,9 @@ export default function SettingsPage() {
         isOwner={isOwner}
         currentUserId={user?.userId ?? 0}
       />
+
+      {/* Danger Zone */}
+      <DangerZoneSection />
     </div>
   );
 }
@@ -462,5 +471,137 @@ function FamilyGroupSection({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Danger Zone Section ────────────────────────────────────────────────────────
+
+function DangerZoneSection() {
+  const resetMutation = useResetFinancialData();
+  const [step1Open, setStep1Open] = useState(false);
+  const [step2Open, setStep2Open] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+
+  function handleStep1Confirm() {
+    setStep1Open(false);
+    setStep2Open(true);
+    setConfirmText('');
+  }
+
+  async function handleFinalReset() {
+    try {
+      await resetMutation.mutateAsync();
+      toast.success('Dados financeiros zerados com sucesso!');
+      setStep2Open(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Erro ao zerar dados financeiros.');
+    }
+  }
+
+  return (
+    <>
+      <Card className="border-rose-200 dark:border-rose-500/20">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-500/15">
+              <TriangleAlert className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div>
+              <CardTitle className="text-base text-rose-700 dark:text-rose-400">Zona de Perigo</CardTitle>
+              <CardDescription>Ações irreversíveis. Use com muito cuidado.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-rose-100 dark:border-rose-500/10 bg-rose-50/50 dark:bg-rose-500/5 p-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                Zerar todas as movimentações
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Remove todas as transações, faturas, lançamentos de cofrinhos e investimentos,
+                zerando saldos de contas. Contas, cartões, cofrinhos e investimentos cadastrados são mantidos.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
+              onClick={() => setStep1Open(true)}
+            >
+              Zerar dados
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Passo 1: aviso inicial */}
+      <ConfirmDialog
+        open={step1Open}
+        onOpenChange={setStep1Open}
+        title="Zerar todas as movimentações?"
+        description={
+          <span>
+            Esta ação irá apagar <strong>todas as transações, faturas e lançamentos</strong> e zerar
+            os saldos de contas, cofrinhos e investimentos.
+            <br /><br />
+            Os cadastros de contas, cartões, cofrinhos e investimentos serão mantidos.
+            Você precisará confirmar novamente na próxima etapa.
+          </span>
+        }
+        confirmLabel="Continuar"
+        variant="danger"
+        onConfirm={handleStep1Confirm}
+      />
+
+      {/* Passo 2: confirmação digitando ZERAR */}
+      <Dialog
+        open={step2Open}
+        onOpenChange={(o) => { if (!resetMutation.isPending) setStep2Open(o); }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <TriangleAlert className="h-4 w-4" />
+              Confirmação final
+            </DialogTitle>
+            <DialogDescription>
+              Esta ação é <strong>irreversível</strong>. Digite{' '}
+              <code className="rounded bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-xs text-rose-600 dark:text-rose-400">
+                ZERAR
+              </code>{' '}
+              para confirmar que deseja apagar todos os dados financeiros.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Input
+            placeholder="Digite ZERAR"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="font-mono"
+            disabled={resetMutation.isPending}
+          />
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setStep2Open(false)}
+              disabled={resetMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-rose-500 hover:bg-rose-600 text-white"
+              disabled={confirmText !== 'ZERAR' || resetMutation.isPending}
+              onClick={handleFinalReset}
+            >
+              {resetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Zerar agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { use } from 'react';
-import { ArrowLeft, Plus, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, CheckCircle2, Clock, XCircle, Layers, Trash2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { DatePickerInput } from '@/components/ui/date-picker';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -22,8 +23,11 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from '@/components/ui/sheet';
 
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { CardVisual } from '@/components/credit-cards/card-visual';
 import {
   useCreditCard, useInvoice, useInvoices, useCreateCardTransaction, usePayInvoice, useAccounts,
+  useDeleteCardTransaction,
 } from '@/hooks/use-finance';
 import {
   TRANSACTION_CATEGORY_LABELS,
@@ -48,9 +52,41 @@ function localDateStr(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+function fmtMonthYear(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' })
+    .format(new Date(y, m - 1, 1));
+}
+
+/** Mês/ano da 1ª parcela derivado do yearMonth da fatura e do número da parcela atual */
+function calcStartMonth(invoiceYearMonth: string, installmentNumber: number): string {
+  const [y, m] = invoiceYearMonth.split('-').map(Number);
+  const start = new Date(y, m - 1 - (installmentNumber - 1), 1);
+  return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(start);
+}
+
+/** Mês/ano da última parcela derivado do yearMonth da fatura e do número da parcela atual */
+function calcEndMonth(invoiceYearMonth: string, installmentNumber: number, totalInstallments: number): string {
+  const [y, m] = invoiceYearMonth.split('-').map(Number);
+  const end = new Date(y, m - 1 + (totalInstallments - installmentNumber), 1);
+  return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(end);
+}
+
 function currentYearMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Mês de faturamento atual para o cartão, usando a mesma lógica do backend */
+function billingYearMonth(closingDay: number): string {
+  const today = new Date();
+  const d = today.getDate();
+  // Se ainda não fechou (hoje <= dia de fechamento), fatura é do mês atual
+  // Senão, a fatura atual é do próximo mês
+  const base = d <= closingDay
+    ? new Date(today.getFullYear(), today.getMonth(), 1)
+    : new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function StatusBadge({ status }: { status: InvoiceStatus }) {
@@ -69,19 +105,6 @@ function StatusBadge({ status }: { status: InvoiceStatus }) {
       {icons[status]}{INVOICE_STATUS_LABELS[status]}
     </span>
   );
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function lightenColor(hex: string, factor: number): string {
-  const clean = (hex.startsWith('#') ? hex.slice(1) : hex).padEnd(6, '0');
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  const nr = Math.round(r + (255 - r) * factor);
-  const ng = Math.round(g + (255 - g) * factor);
-  const nb = Math.round(b + (255 - b) * factor);
-  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
 }
 
 // ── Purchase form schema ───────────────────────────────────────────────────────
@@ -133,8 +156,9 @@ function PayInvoiceSheet({
       toast.success('Pagamento registrado!');
       onOpenChange(false);
       reset();
-    } catch {
-      toast.error('Erro ao registrar pagamento.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Erro ao registrar pagamento.');
     }
   }
 
@@ -165,7 +189,9 @@ function PayInvoiceSheet({
 
           <div className="space-y-1.5">
             <Label htmlFor="payAmount">Valor pago (R$)</Label>
-            <Input id="payAmount" type="number" step="0.01" {...register('amount')} />
+            <Controller name="amount" control={control} render={({ field }) => (
+              <CurrencyInput id="payAmount" value={field.value} onChange={(v) => field.onChange(v ?? 0)} />
+            )} />
             {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
           </div>
 
@@ -198,11 +224,30 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
 
   const [selectedYearMonth, setSelectedYearMonth] = useState(currentYearMonth());
   const [paySheetOpen, setPaySheetOpen] = useState(false);
+  const [historyInitialized, setHistoryInitialized] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ transactionId: number; description: string; totalInstallments: number } | null>(null);
 
   const { data: card, isLoading: cardLoading } = useCreditCard(cardId);
   const { data: invoice, isLoading: invoiceLoading, refetch: refetchInvoice } = useInvoice(cardId, selectedYearMonth);
   const { data: history = [], isLoading: historyLoading } = useInvoices(cardId);
+
+  // Auto-seleciona o mês de faturamento atual na primeira carga do histórico
+  // Prioridade: mês atual do cartão → mais recente com dados
+  useEffect(() => {
+    if (!historyInitialized && history.length > 0 && card) {
+      const billing = billingYearMonth(card.closingDay);
+      const hasBilling = history.some((h) => h.yearMonth === billing);
+      if (hasBilling) {
+        setSelectedYearMonth(billing);
+      } else {
+        const sorted = [...history].sort((a, b) => b.yearMonth.localeCompare(a.yearMonth));
+        setSelectedYearMonth(sorted[0].yearMonth);
+      }
+      setHistoryInitialized(true);
+    }
+  }, [history, historyInitialized, card]);
   const createTxMutation = useCreateCardTransaction();
+  const deleteTxMutation = useDeleteCardTransaction();
 
   const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<PurchaseFormData>({
     resolver: zodResolver(purchaseSchema),
@@ -228,44 +273,29 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
       toast.success('Compra lançada!');
       reset({ description: '', totalAmount: undefined, purchaseDate: localDateStr(new Date()), category: '', totalInstallments: 1 });
       if (selectedYearMonth === currentYearMonth()) refetchInvoice();
-    } catch {
-      toast.error('Erro ao lançar compra.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Erro ao lançar compra.');
     }
   }
-
-  const color = card?.color ? (card.color.startsWith('#') ? card.color : `#${card.color}`) : '#1E3A5F';
-  const colorLight = lightenColor(color, 0.3);
 
   return (
     <div className="space-y-6">
       {/* Back */}
       <Link href="/finance/credit-cards" className={buttonVariants({ variant: "ghost", size: "sm", className: "text-slate-500 -ml-2" })}><ArrowLeft className="h-4 w-4 mr-1" />Cartões</Link>
 
-      {/* Card header */}
+      {/* Card visual */}
       {cardLoading ? (
-        <div className="h-36 rounded-xl bg-slate-200 animate-pulse" />
-      ) : card ? (
-        <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: `linear-gradient(135deg, ${color} 0%, ${colorLight} 100%)` }}>
-          <div className="p-6 flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-white/70 text-xs font-medium uppercase tracking-wide">{card.bankName ?? 'Cartão'}</p>
-                <p className="text-white font-bold text-2xl mt-1">{card.name}</p>
-                <p className="text-white/60 text-sm mt-1 font-mono tracking-widest">•••• •••• •••• {card.lastFourDigits}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-white/70 text-xs">Fatura atual</p>
-                <p className="text-white font-bold text-xl tabular-nums mt-0.5">{formatCurrency(card.currentInvoiceTotal)}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-white/80">
-              <span>Disponível: <strong className="text-white">{formatCurrency(card.availableLimit)}</strong></span>
-              <span>Limite: <strong className="text-white">{formatCurrency(card.totalLimit)}</strong></span>
-              <span>Fecha dia <strong className="text-white">{card.closingDay}</strong></span>
-              <span>Vence dia <strong className="text-white">{card.dueDay}</strong></span>
-            </div>
+        <div className="overflow-hidden rounded-2xl shadow-lg ring-1 ring-black/5">
+          <div className="h-52 animate-pulse bg-slate-200" />
+          <div className="bg-white px-4 py-3 space-y-2">
+            <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+            <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-100" />
+            <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
           </div>
         </div>
+      ) : card ? (
+        <CardVisual card={card} showUsage />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -284,11 +314,11 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
                   >
                     {history.map((inv) => (
                       <option key={inv.yearMonth} value={inv.yearMonth}>
-                        {inv.yearMonth} — {formatCurrency(inv.totalAmount)}
+                        {fmtMonthYear(inv.yearMonth)} — {formatCurrency(inv.totalAmount)}
                       </option>
                     ))}
                     {!history.find((h) => h.yearMonth === currentYearMonth()) && (
-                      <option value={currentYearMonth()}>Atual</option>
+                      <option value={currentYearMonth()}>Mês atual</option>
                     )}
                   </select>
                 )}
@@ -338,30 +368,148 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
                     <p className="py-4 text-center text-sm text-slate-400">Nenhuma compra nesta fatura.</p>
                   ) : (
                     <div className="space-y-1">
-                      {invoice.transactions.map((tx) => (
-                        <div key={tx.id} className="flex items-center gap-3 py-2 rounded-lg hover:bg-slate-50 px-2 -mx-2 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">
-                              {tx.description}
-                              {tx.totalInstallments > 1 && (
-                                <span className="ml-1 text-xs text-slate-400">({tx.installmentNumber}/{tx.totalInstallments}x)</span>
-                              )}
+                      {invoice.transactions.map((tx) => {
+                        const isParcelado = tx.totalInstallments > 1;
+                        const startMonth = calcStartMonth(invoice.yearMonth, tx.installmentNumber);
+                        const endMonth   = calcEndMonth(invoice.yearMonth, tx.installmentNumber, tx.totalInstallments);
+                        const pct        = Math.round((tx.installmentNumber / tx.totalInstallments) * 100);
+                        const canDelete  = invoice.status !== 'PAID';
+                        return (
+                          <div key={tx.id} className="group rounded-xl border border-slate-100 dark:border-white/6 bg-slate-50/60 dark:bg-white/3 px-3 py-2.5 hover:bg-slate-100/70 dark:hover:bg-white/5 transition-colors">
+                            {/* Linha 1: descrição + parcela badge + valor + botão excluir */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                                  {tx.description}
+                                </p>
+                                {isParcelado && (
+                                  <span className="shrink-0 inline-flex items-center rounded-full bg-violet-100 dark:bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">
+                                    {tx.installmentNumber}/{tx.totalInstallments}x
+                                  </span>
+                                )}
+                              </div>
+                              <div className="shrink-0 flex items-start gap-2">
+                                <div className="text-right">
+                                  <span className="text-sm font-bold tabular-nums text-rose-500 dark:text-rose-400">
+                                    {formatCurrency(tx.installmentAmount)}
+                                  </span>
+                                  {isParcelado && (
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                                      total {formatCurrency(tx.totalAmount)}
+                                    </p>
+                                  )}
+                                </div>
+                                {canDelete && (
+                                  <button
+                                    onClick={() => setDeleteConfirm({ transactionId: tx.id, description: tx.description, totalInstallments: tx.totalInstallments })}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 rounded p-0.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                                    title="Excluir lançamento"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Linha 2: categoria + data */}
+                            <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                              {TRANSACTION_CATEGORY_LABELS[tx.category]}
+                              {' · '}
+                              {new Date(tx.purchaseDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </p>
-                            <p className="text-xs text-slate-400">
-                              {TRANSACTION_CATEGORY_LABELS[tx.category]} · {new Date(tx.purchaseDate + 'T00:00:00').toLocaleDateString('pt-BR')}
-                            </p>
+
+                            {/* Linha 3: detalhe de parcelamento */}
+                            {isParcelado && (
+                              <div className="mt-2 space-y-1">
+                                <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+                                  <span>Início: <strong className="text-slate-600 dark:text-slate-300">{startMonth}</strong></span>
+                                  <span>Término: <strong className={tx.lastInstallment ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}>{endMonth}</strong></span>
+                                </div>
+                                <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                                  <div
+                                    className={`h-1 rounded-full transition-all ${tx.lastInstallment ? 'bg-emerald-500' : 'bg-violet-400'}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                  {tx.installmentNumber === tx.totalInstallments
+                                    ? '✅ Última parcela'
+                                    : `${tx.totalInstallments - tx.installmentNumber} parcela${tx.totalInstallments - tx.installmentNumber !== 1 ? 's' : ''} restante${tx.totalInstallments - tx.installmentNumber !== 1 ? 's' : ''}`}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                          <span className="text-sm font-semibold tabular-nums text-rose-500 shrink-0">
-                            {formatCurrency(tx.installmentAmount)}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Parcelamentos em andamento */}
+          {invoice && (() => {
+            const parcelas = invoice.transactions.filter((t) => t.totalInstallments > 1);
+            if (parcelas.length === 0) return null;
+            return (
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-500/15">
+                      <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <CardTitle className="text-base">Parcelamentos em andamento</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {parcelas.map((tx) => {
+                    const startMonth = calcStartMonth(invoice.yearMonth, tx.installmentNumber);
+                    const endMonth   = calcEndMonth(invoice.yearMonth, tx.installmentNumber, tx.totalInstallments);
+                    const pct        = Math.round((tx.installmentNumber / tx.totalInstallments) * 100);
+                    const remaining  = tx.totalInstallments - tx.installmentNumber;
+                    return (
+                      <div key={tx.id} className="rounded-xl border border-violet-100 dark:border-violet-500/15 bg-violet-50/40 dark:bg-violet-500/5 p-3">
+                        {/* Linha 1: descrição + progresso */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{tx.description}</p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">{TRANSACTION_CATEGORY_LABELS[tx.category]}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <span className="inline-flex items-center rounded-full bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 text-xs font-bold text-violet-700 dark:text-violet-300">
+                              {tx.installmentNumber}/{tx.totalInstallments}x
+                            </span>
+                            <p className="mt-1 text-sm font-bold tabular-nums text-rose-500 dark:text-rose-400">
+                              {formatCurrency(tx.installmentAmount)}<span className="text-xs font-normal text-slate-400">/mês</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Barra de progresso */}
+                        <div className="mt-2.5 space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                            <span>Início: <strong className="text-slate-700 dark:text-slate-200">{startMonth}</strong></span>
+                            <span>Término: <strong className={tx.lastInstallment ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}>{endMonth}</strong></span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-violet-200/60 dark:bg-violet-500/20">
+                            <div
+                              className={`h-2 rounded-full transition-all ${tx.lastInstallment ? 'bg-emerald-500' : 'bg-violet-500'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
+                            <span>{pct}% pago · total {formatCurrency(tx.totalAmount)}</span>
+                            <span>{tx.lastInstallment ? '✅ Última parcela' : `${remaining} restante${remaining !== 1 ? 's' : ''}`}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Invoice history */}
           {!historyLoading && history.length > 0 && (
@@ -375,13 +523,13 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
                     key={inv.yearMonth}
                     onClick={() => setSelectedYearMonth(inv.yearMonth)}
                     className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-                      selectedYearMonth === inv.yearMonth ? 'bg-slate-100' : 'hover:bg-slate-50'
+                      selectedYearMonth === inv.yearMonth ? 'bg-slate-100 dark:bg-white/8' : 'hover:bg-slate-50 dark:hover:bg-white/4'
                     }`}
                   >
-                    <span className="font-medium text-slate-700">{inv.yearMonth}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">{fmtMonthYear(inv.yearMonth)}</span>
                     <div className="flex items-center gap-3">
                       <StatusBadge status={inv.status} />
-                      <span className="tabular-nums font-semibold text-slate-800">{formatCurrency(inv.totalAmount)}</span>
+                      <span className="tabular-nums font-semibold text-slate-800 dark:text-slate-100">{formatCurrency(inv.totalAmount)}</span>
                     </div>
                   </button>
                 ))}
@@ -408,7 +556,9 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
 
                 <div className="space-y-1.5">
                   <Label htmlFor="p-amount">Valor (R$)</Label>
-                  <Input id="p-amount" type="number" step="0.01" placeholder="0,00" {...register('totalAmount')} />
+                  <Controller name="totalAmount" control={control} render={({ field }) => (
+                    <CurrencyInput id="p-amount" value={field.value} onChange={(v) => field.onChange(v ?? 0)} />
+                  )} />
                   {errors.totalAmount && <p className="text-xs text-red-500">{errors.totalAmount.message}</p>}
                 </div>
 
@@ -461,6 +611,33 @@ export default function CardDetailPage({ params }: { params: Promise<{ id: strin
           cardId={cardId}
         />
       )}
+
+      {/* Delete transaction confirm */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(v) => { if (!v) setDeleteConfirm(null); }}
+        title="Excluir lançamento"
+        description={
+          deleteConfirm
+            ? deleteConfirm.totalInstallments > 1
+              ? `Isso irá excluir "${deleteConfirm.description}" e todas as ${deleteConfirm.totalInstallments} parcelas ainda não pagas. Esta ação não pode ser desfeita.`
+              : `Tem certeza que deseja excluir "${deleteConfirm.description}"? Esta ação não pode ser desfeita.`
+            : ''
+        }
+        confirmLabel="Excluir"
+        variant="danger"
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await deleteTxMutation.mutateAsync({ cardId, transactionId: deleteConfirm.transactionId });
+            toast.success('Lançamento excluído.');
+            setDeleteConfirm(null);
+          } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast.error(msg || 'Erro ao excluir lançamento.');
+          }
+        }}
+      />
     </div>
   );
 }

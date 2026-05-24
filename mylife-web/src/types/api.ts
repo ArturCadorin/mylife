@@ -151,8 +151,8 @@ export interface SavingsSummary {
   savingsId: number;
   name: string;
   currentAmount: number;
-  targetAmount: number;
-  progressPercentage: number;
+  targetAmount: number | null;
+  progressPercentage: number | null;
 }
 
 export interface FinancialOverviewResponse {
@@ -564,6 +564,56 @@ export interface WishListItemUpdateRequest {
 export interface PurchaseRequest {
   linkedAccountId?: number;
   note?: string;
+}
+
+// ── Month Simulator ───────────────────────────────────────────────────────────
+
+export interface SimulatorItemResponse {
+  description: string;
+  amount: number;
+  type: TransactionType;
+  category: TransactionCategory;
+  date: string;
+  accountName: string;
+  confirmed: boolean;
+}
+
+export interface CreditCardDueItem {
+  cardName: string;
+  bankName: string;
+  color: string;
+  amount: number;
+  dueDate: string;
+  status: InvoiceStatus;
+}
+
+export interface MonthSimulatorResponse {
+  month: string;
+
+  // Patrimônio atual
+  netWorth: number;
+  totalAccounts: number;
+  totalSavings: number;
+  totalInvestments: number;
+  totalCreditCardDebt: number;
+
+  // Itens do mês
+  confirmedIncome: SimulatorItemResponse[];
+  confirmedExpenses: SimulatorItemResponse[];
+  pendingRecurringIncome: SimulatorItemResponse[];
+  pendingRecurringExpenses: SimulatorItemResponse[];
+  creditCardDueItems: CreditCardDueItem[];
+
+  // Totais
+  totalConfirmedIncome: number;
+  totalConfirmedExpenses: number;
+  totalPendingIncome: number;
+  totalPendingExpenses: number;
+  totalCreditCardDueThisMonth: number;
+  totalProjectedIncome: number;
+  totalProjectedExpenses: number;
+  projectedMonthBalance: number;
+  projectedNetWorth: number;
 }
 
 // ── Fit ───────────────────────────────────────────────────────────────────────

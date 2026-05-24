@@ -4,6 +4,7 @@ import com.mylife.core.domain.entity.User;
 import com.mylife.core.dto.response.ApiResponse;
 import com.mylife.finance.domain.enums.TransactionType;
 import com.mylife.finance.dto.response.report.*;
+import com.mylife.finance.dto.response.report.MonthSimulatorResponse;
 import com.mylife.finance.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -85,5 +86,15 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.success(
                 reportService.getRecurrenceProjection(user),
                 "Projeção de recorrências obtida com sucesso."));
+    }
+
+    @Operation(summary = "Simulador do mês — patrimônio, fluxo confirmado, recorrências previstas e faturas CC (formato: yyyy-MM)")
+    @GetMapping("/month-simulator")
+    public ResponseEntity<ApiResponse<MonthSimulatorResponse>> getMonthSimulator(
+            @RequestParam String month,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(
+                reportService.getMonthSimulator(month, user),
+                "Simulador do mês obtido com sucesso."));
     }
 }

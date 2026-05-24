@@ -16,7 +16,7 @@ public class InvoiceResponse {
     private Long id;
     private Long creditCardId;
     private String creditCardName;
-    private String referenceMonth;
+    private String yearMonth;
     private LocalDate dueDate;
     private BigDecimal totalAmount;
     private InvoiceStatus status;

@@ -17,7 +17,6 @@ import type {
   CreditCardUpdateRequest,
   CreditCardTransactionResponse,
   CreditCardTransactionRequest,
-  InvoiceSummaryResponse,
   InvoiceResponse,
   InvoicePaymentRequest,
   SavingsResponse,
@@ -40,6 +39,7 @@ import type {
   CategorySummaryResponse,
   MonthlyComparisonResponse,
   RecurrenceProjectionResponse,
+  MonthSimulatorResponse,
   TransactionType,
 } from '@/types/api';
 
@@ -292,7 +292,7 @@ export function useInvoices(cardId: number) {
   return useQuery({
     queryKey: ['finance', 'credit-cards', cardId, 'invoices'],
     queryFn: async () => {
-      const { data } = await api.get<ApiResponse<InvoiceSummaryResponse[]>>(
+      const { data } = await api.get<ApiResponse<InvoiceResponse[]>>(
         `/finance/credit-cards/${cardId}/invoices`
       );
       return data.data;
@@ -311,6 +311,7 @@ export function useInvoice(cardId: number, yearMonth: string) {
       return data.data;
     },
     enabled: cardId > 0 && !!yearMonth,
+    retry: false,
   });
 }
 
@@ -340,6 +341,20 @@ export function usePayInvoice() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['finance', 'credit-cards'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'overview'] });
+    },
+  });
+}
+
+export function useDeleteCardTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cardId, transactionId }: { cardId: number; transactionId: number }) => {
+      await api.delete(`/finance/credit-cards/${cardId}/transactions/${transactionId}`);
+    },
+    onSuccess: (_, { cardId }) => {
+      qc.invalidateQueries({ queryKey: ['finance', 'credit-cards', cardId] });
+      qc.invalidateQueries({ queryKey: ['finance', 'credit-cards', cardId, 'invoices'] });
       qc.invalidateQueries({ queryKey: ['finance', 'overview'] });
     },
   });
@@ -679,5 +694,33 @@ export function useRecurrenceProjection(startDate: string, endDate: string) {
       return data.data;
     },
     enabled: !!startDate && !!endDate,
+  });
+}
+
+export function useMonthSimulator(month: string) {
+  return useQuery({
+    queryKey: ['finance', 'reports', 'month-simulator', month],
+    queryFn: async () => {
+      const { data } = await api.get<ApiResponse<MonthSimulatorResponse>>(
+        `/finance/reports/month-simulator?month=${month}`
+      );
+      return data.data;
+    },
+    enabled: !!month,
+  });
+}
+
+// ── Finance Reset ──────────────────────────────────────────────────────────────
+
+export function useResetFinancialData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await api.delete('/finance/data/reset');
+    },
+    onSuccess: () => {
+      // Invalidate all finance query keys so every page reflects the reset
+      qc.invalidateQueries({ queryKey: ['finance'] });
+    },
   });
 }

@@ -297,24 +297,33 @@ export default function DashboardPage() {
                 : overview?.savingsSummaries?.length === 0
                 ? <p className="text-sm text-slate-400">Nenhum cofrinho criado</p>
                 : overview?.savingsSummaries?.slice(0, 3).map((s) => {
-                    const pct = Math.min(s.progressPercentage, 100);
+                    const hasTarget = s.targetAmount != null && s.targetAmount > 0;
+                    const rawPct = s.progressPercentage;
+                    const pct = hasTarget && rawPct != null && !isNaN(rawPct)
+                      ? Math.min(rawPct, 100)
+                      : null;
                     return (
                       <div key={s.savingsId}>
                         <div className="mb-1.5 flex items-baseline justify-between">
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-300">{s.name}</p>
-                          <span className={`ml-2 shrink-0 text-xs font-bold ${pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-violet-500 dark:text-violet-400'}`}>
-                            {Math.round(pct)}%
-                          </span>
+                          {pct !== null
+                            ? <span className={`ml-2 shrink-0 text-xs font-bold ${pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-violet-500 dark:text-violet-400'}`}>
+                                {Math.round(pct)}%
+                              </span>
+                            : <span className="ml-2 shrink-0 text-xs text-slate-400 dark:text-slate-500 italic">sem meta</span>
+                          }
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/8">
                           <div
                             className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all"
-                            style={{ width: `${pct}%` }}
+                            style={{ width: `${pct ?? 0}%` }}
                           />
                         </div>
                         <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
-                          {fmt(s.currentAmount)}{' '}
-                          <span className="text-slate-300 dark:text-slate-600">/ {fmt(s.targetAmount)}</span>
+                          {fmt(s.currentAmount)}
+                          {hasTarget && s.targetAmount != null && (
+                            <span className="text-slate-300 dark:text-slate-600"> / {fmt(s.targetAmount)}</span>
+                          )}
                         </p>
                       </div>
                     );

@@ -14,10 +14,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -100,12 +96,11 @@ public class CreditCardController {
 
     @Operation(summary = "Listar faturas do cartão")
     @GetMapping("/{id}/invoices")
-    public ResponseEntity<ApiResponse<Page<InvoiceResponse>>> findInvoices(
+    public ResponseEntity<ApiResponse<List<InvoiceResponse>>> findInvoices(
             @PathVariable Long id,
-            @AuthenticationPrincipal User user,
-            @PageableDefault(size = 12, sort = "referenceMonth", direction = Sort.Direction.DESC) Pageable pageable) {
+            @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
-                creditCardService.findInvoices(id, user, pageable),
+                creditCardService.findInvoices(id, user),
                 "Faturas encontradas."));
     }
 
@@ -118,6 +113,16 @@ public class CreditCardController {
         return ResponseEntity.ok(ApiResponse.success(
                 creditCardService.findInvoiceByMonth(id, yearMonth, user),
                 "Fatura encontrada."));
+    }
+
+    @Operation(summary = "Excluir lançamento — remove a compra e todas as suas parcelas restantes (não paga)")
+    @DeleteMapping("/{id}/transactions/{transactionId}")
+    public ResponseEntity<ApiResponse<Void>> deleteTransaction(
+            @PathVariable Long id,
+            @PathVariable Long transactionId,
+            @AuthenticationPrincipal User user) {
+        creditCardService.deleteTransaction(id, transactionId, user);
+        return ResponseEntity.ok(ApiResponse.success(null, "Lançamento excluído com sucesso."));
     }
 
     @Operation(summary = "Pagar fatura — debita conta informada e gera Transaction(EXPENSE)")

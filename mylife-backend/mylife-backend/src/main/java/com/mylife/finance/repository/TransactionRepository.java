@@ -10,6 +10,7 @@ import com.mylife.finance.domain.enums.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -122,4 +123,59 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            "AND t.parentTransaction IS NULL AND t.pending = false AND t.nextOccurrenceDate IS NOT NULL")
     List<Transaction> findActiveRecurrencesByOwner(@Param("owner") User owner,
                                                    @Param("types") List<RecurrenceType> types);
+
+    // Simulator: confirmed transactions that affect balance (excludes parent recurring)
+    @Query("SELECT t FROM Transaction t JOIN FETCH t.account " +
+           "WHERE t.familyGroup = :fg AND t.type = :type " +
+           "AND t.date BETWEEN :from AND :to AND t.pending = false " +
+           "AND (t.recurrenceType = 'NONE' OR t.parentTransaction IS NOT NULL) " +
+           "ORDER BY t.date DESC")
+    List<Transaction> findConfirmedByFamilyGroupAndTypeAndDateBetween(@Param("fg") FamilyGroup fg,
+                                                                      @Param("type") TransactionType type,
+                                                                      @Param("from") LocalDate from,
+                                                                      @Param("to") LocalDate to);
+
+    @Query("SELECT t FROM Transaction t JOIN FETCH t.account " +
+           "WHERE t.owner = :owner AND t.type = :type " +
+           "AND t.date BETWEEN :from AND :to AND t.pending = false " +
+           "AND (t.recurrenceType = 'NONE' OR t.parentTransaction IS NOT NULL) " +
+           "ORDER BY t.date DESC")
+    List<Transaction> findConfirmedByOwnerAndTypeAndDateBetween(@Param("owner") User owner,
+                                                                @Param("type") TransactionType type,
+                                                                @Param("from") LocalDate from,
+                                                                @Param("to") LocalDate to);
+
+    // Simulator: pending recurring parents with next occurrence in selected month
+    @Query("SELECT t FROM Transaction t JOIN FETCH t.account " +
+           "WHERE t.familyGroup = :fg AND t.type = :type " +
+           "AND t.recurrenceType IN :types AND t.parentTransaction IS NULL " +
+           "AND t.pending = false AND t.nextOccurrenceDate BETWEEN :from AND :to " +
+           "ORDER BY t.nextOccurrenceDate ASC")
+    List<Transaction> findPendingRecurringByFamilyGroupAndTypeAndDateBetween(
+            @Param("fg") FamilyGroup fg,
+            @Param("type") TransactionType type,
+            @Param("types") List<RecurrenceType> types,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    @Query("SELECT t FROM Transaction t JOIN FETCH t.account " +
+           "WHERE t.owner = :owner AND t.type = :type " +
+           "AND t.recurrenceType IN :types AND t.parentTransaction IS NULL " +
+           "AND t.pending = false AND t.nextOccurrenceDate BETWEEN :from AND :to " +
+           "ORDER BY t.nextOccurrenceDate ASC")
+    List<Transaction> findPendingRecurringByOwnerAndTypeAndDateBetween(
+            @Param("owner") User owner,
+            @Param("type") TransactionType type,
+            @Param("types") List<RecurrenceType> types,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    // Finance reset: clear self-referential FK, then bulk delete
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Transaction t SET t.parentTransaction = null WHERE t.familyGroup = :fg")
+    void clearParentTransactionRefs(@Param("fg") FamilyGroup fg);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Transaction t WHERE t.familyGroup = :fg")
+    void deleteAllByFamilyGroup(@Param("fg") FamilyGroup fg);
 }

@@ -6,6 +6,7 @@ import com.mylife.core.domain.enums.Role;
 import com.mylife.core.exception.BusinessException;
 import com.mylife.core.repository.UserRepository;
 import com.mylife.finance.domain.entity.Account;
+import com.mylife.finance.domain.entity.Invoice;
 import com.mylife.finance.domain.entity.Savings;
 import com.mylife.finance.domain.entity.Transaction;
 import com.mylife.finance.domain.enums.InvoiceStatus;
@@ -339,7 +340,129 @@ public class ReportService {
                 .build();
     }
 
+    // ── Month simulator ────────────────────────────────────────────────────────
+
+    public MonthSimulatorResponse getMonthSimulator(String yearMonthStr, User authenticatedUser) {
+        User user = reloadUser(authenticatedUser);
+        FamilyGroup fg = requireFamilyGroup(user);
+        boolean isOwner = user.getRole() == Role.OWNER;
+
+        YearMonth ym = parseYearMonth(yearMonthStr);
+        LocalDate from = ym.atDay(1);
+        LocalDate to   = ym.atEndOfMonth();
+
+        List<RecurrenceType> activeTypes   = List.of(RecurrenceType.AUTOMATIC, RecurrenceType.MANUAL);
+        List<InvoiceStatus>  unpaidStatuses = List.of(InvoiceStatus.OPEN, InvoiceStatus.CLOSED);
+
+        // 1. Patrimônio atual (reutiliza lógica existente)
+        FinancialOverviewResponse overview = getFinancialOverview(authenticatedUser);
+
+        // 2. Transações confirmadas do mês (excluindo pais recorrentes; excluindo pagamentos de CC)
+        List<Transaction> confirmedIncomeRaw = isOwner
+                ? transactionRepository.findConfirmedByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME, from, to)
+                : transactionRepository.findConfirmedByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME, from, to);
+
+        List<Transaction> confirmedExpenseRaw = isOwner
+                ? transactionRepository.findConfirmedByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, from, to)
+                : transactionRepository.findConfirmedByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, from, to);
+
+        // Excluir lançamentos de pagamento de fatura (categoria CREDIT_CARD) — já contabilizados na dívida
+        confirmedExpenseRaw = confirmedExpenseRaw.stream()
+                .filter(t -> t.getCategory() != TransactionCategory.CREDIT_CARD)
+                .toList();
+
+        // 3. Recorrências previstas para o mês (próxima ocorrência dentro do período)
+        List<Transaction> pendingIncomeRaw = isOwner
+                ? transactionRepository.findPendingRecurringByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME, activeTypes, from, to)
+                : transactionRepository.findPendingRecurringByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME, activeTypes, from, to);
+
+        List<Transaction> pendingExpenseRaw = isOwner
+                ? transactionRepository.findPendingRecurringByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, activeTypes, from, to)
+                : transactionRepository.findPendingRecurringByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, activeTypes, from, to);
+
+        // 4. Faturas de cartão que vencem neste mês
+        List<Invoice> invoicesDue = isOwner
+                ? invoiceRepository.findDueByFamilyGroupAndDateRange(fg, from, to, unpaidStatuses)
+                : invoiceRepository.findDueByOwnerAndDateRange(user, from, to, unpaidStatuses);
+
+        // 5. Converter para DTO
+        List<SimulatorItemResponse> confirmedIncome   = confirmedIncomeRaw.stream().map(t -> toSimulatorItem(t, true)).toList();
+        List<SimulatorItemResponse> confirmedExpenses = confirmedExpenseRaw.stream().map(t -> toSimulatorItem(t, true)).toList();
+        List<SimulatorItemResponse> pendingIncome     = pendingIncomeRaw.stream().map(t -> toSimulatorItem(t, false)).toList();
+        List<SimulatorItemResponse> pendingExpenses   = pendingExpenseRaw.stream().map(t -> toSimulatorItem(t, false)).toList();
+
+        List<CreditCardDueItem> cardDueItems = invoicesDue.stream()
+                .map(inv -> CreditCardDueItem.builder()
+                        .cardName(inv.getCreditCard().getName())
+                        .bankName(inv.getCreditCard().getBankName())
+                        .color(inv.getCreditCard().getColor())
+                        .amount(inv.getTotalAmount())
+                        .dueDate(inv.getDueDate())
+                        .status(inv.getStatus())
+                        .build())
+                .toList();
+
+        // 6. Calcular totais
+        BigDecimal totalConfirmedIncome   = sumTransactions(confirmedIncomeRaw);
+        BigDecimal totalConfirmedExpenses = sumTransactions(confirmedExpenseRaw);
+        BigDecimal totalPendingIncome     = sumTransactions(pendingIncomeRaw);
+        BigDecimal totalPendingExpenses   = sumTransactions(pendingExpenseRaw);
+        BigDecimal totalCCDue             = invoicesDue.stream()
+                .map(Invoice::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalProjectedIncome   = totalConfirmedIncome.add(totalPendingIncome);
+        BigDecimal totalProjectedExpenses = totalConfirmedExpenses.add(totalPendingExpenses).add(totalCCDue);
+        BigDecimal projectedMonthBalance  = totalProjectedIncome.subtract(totalProjectedExpenses);
+
+        // Patrimônio projetado: netWorth atual + o que ainda vai entrar/sair
+        BigDecimal projectedNetWorth = overview.getNetWorth()
+                .add(totalPendingIncome)
+                .subtract(totalPendingExpenses)
+                .subtract(totalCCDue);
+
+        return MonthSimulatorResponse.builder()
+                .month(yearMonthStr)
+                .netWorth(overview.getNetWorth())
+                .totalAccounts(overview.getTotalBalanceAllAccounts())
+                .totalSavings(overview.getTotalSavings())
+                .totalInvestments(overview.getTotalInvestments())
+                .totalCreditCardDebt(overview.getTotalCreditCardDebt())
+                .confirmedIncome(confirmedIncome)
+                .confirmedExpenses(confirmedExpenses)
+                .pendingRecurringIncome(pendingIncome)
+                .pendingRecurringExpenses(pendingExpenses)
+                .creditCardDueItems(cardDueItems)
+                .totalConfirmedIncome(totalConfirmedIncome)
+                .totalConfirmedExpenses(totalConfirmedExpenses)
+                .totalPendingIncome(totalPendingIncome)
+                .totalPendingExpenses(totalPendingExpenses)
+                .totalCreditCardDueThisMonth(totalCCDue)
+                .totalProjectedIncome(totalProjectedIncome)
+                .totalProjectedExpenses(totalProjectedExpenses)
+                .projectedMonthBalance(projectedMonthBalance)
+                .projectedNetWorth(projectedNetWorth)
+                .build();
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    private SimulatorItemResponse toSimulatorItem(Transaction t, boolean confirmed) {
+        return SimulatorItemResponse.builder()
+                .description(t.getDescription())
+                .amount(t.getAmount())
+                .type(t.getType())
+                .category(t.getCategory())
+                .date(confirmed ? t.getDate() : t.getNextOccurrenceDate())
+                .accountName(t.getAccount().getName())
+                .confirmed(confirmed)
+                .build();
+    }
+
+    private BigDecimal sumTransactions(List<Transaction> transactions) {
+        return transactions.stream()
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 
     private BigDecimal computeVariation(BigDecimal previous, BigDecimal current) {
         if (previous.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;

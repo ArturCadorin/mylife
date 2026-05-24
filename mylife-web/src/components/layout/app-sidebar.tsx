@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ArrowLeftRight, Building2, CreditCard,
-  PiggyBank, TrendingUp, Heart, BarChart3, LogOut, Moon, Sun, Settings,
+  PiggyBank, TrendingUp, Heart, BarChart3, LogOut, Moon, Sun, Settings, Calculator,
 } from 'lucide-react';
 import { SolutionSwitcher } from '@/components/layout/solution-switcher';
 import { useState } from 'react';
@@ -40,8 +40,9 @@ const navGroups = [
     ],
   },
   {
-    label: 'Outros',
+    label: 'Planejamento',
     items: [
+      { label: 'Simulador do Mês', icon: Calculator, href: '/finance/simulator' },
       { label: 'Lista de desejos', icon: Heart, href: '/finance/wishlist' },
       { label: 'Relatórios', icon: BarChart3, href: '/finance/reports' },
     ],
