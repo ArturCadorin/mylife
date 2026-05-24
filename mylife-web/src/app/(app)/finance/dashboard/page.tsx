@@ -95,12 +95,8 @@ export default function DashboardPage() {
       value:       fmt(overview?.currentMonthBalance ?? 0),
       sub:         'Receitas − Despesas',
       icon:        TrendingUp,
-      gradient:    (overview?.currentMonthBalance ?? 0) >= 0
-                     ? 'from-emerald-400 to-teal-600'
-                     : 'from-rose-400 to-rose-600',
-      shadowColor: (overview?.currentMonthBalance ?? 0) >= 0
-                     ? 'shadow-emerald-300/40 dark:shadow-emerald-900/30'
-                     : 'shadow-rose-300/40 dark:shadow-rose-900/30',
+      gradient:    'from-orange-400 to-orange-600',
+      shadowColor: 'shadow-orange-300/40 dark:shadow-orange-900/30',
     },
   ] as const;
 
