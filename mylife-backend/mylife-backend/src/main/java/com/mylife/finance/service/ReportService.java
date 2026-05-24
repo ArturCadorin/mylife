@@ -10,6 +10,7 @@ import com.mylife.finance.domain.entity.Invoice;
 import com.mylife.finance.domain.entity.Savings;
 import com.mylife.finance.domain.entity.Transaction;
 import com.mylife.finance.domain.enums.InvoiceStatus;
+import com.mylife.finance.domain.enums.RecurrenceFrequency;
 import com.mylife.finance.domain.enums.RecurrenceType;
 import com.mylife.finance.domain.enums.TransactionCategory;
 import com.mylife.finance.domain.enums.TransactionType;
@@ -380,25 +381,40 @@ public class ReportService {
                 .filter(t -> t.getCategory() != TransactionCategory.CREDIT_CARD)
                 .toList();
 
-        // 3. Recorrências previstas para o mês (próxima ocorrência dentro do período)
-        List<Transaction> pendingIncomeRaw = isOwner
-                ? transactionRepository.findPendingRecurringByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME, activeTypes, from, to)
-                : transactionRepository.findPendingRecurringByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME, activeTypes, from, to);
+        // 3. Projetar recorrências ativas para o mês-alvo (suporta meses futuros)
+        //    Em vez de filtrar por nextOccurrenceDate IN [from,to], avançamos a data pela
+        //    frequência até atingir o mês, o que funciona para qualquer mês futuro.
+        List<Transaction> allActiveRecurrences = isOwner
+                ? transactionRepository.findActiveRecurrencesByFamilyGroup(fg, activeTypes)
+                : transactionRepository.findActiveRecurrencesByOwner(user, activeTypes);
 
-        List<Transaction> pendingExpenseRaw = isOwner
-                ? transactionRepository.findPendingRecurringByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, activeTypes, from, to)
-                : transactionRepository.findPendingRecurringByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, activeTypes, from, to);
+        List<SimulatorItemResponse> pendingIncome   = new ArrayList<>();
+        List<SimulatorItemResponse> pendingExpenses = new ArrayList<>();
+        BigDecimal totalPendingIncome   = BigDecimal.ZERO;
+        BigDecimal totalPendingExpenses = BigDecimal.ZERO;
+
+        for (Transaction t : allActiveRecurrences) {
+            List<LocalDate> occurrences = projectOccurrencesInMonth(t, from, to);
+            for (LocalDate occDate : occurrences) {
+                if (t.getType() == TransactionType.INCOME) {
+                    pendingIncome.add(toSimulatorItemOnDate(t, false, occDate));
+                    totalPendingIncome = totalPendingIncome.add(t.getAmount());
+                } else if (t.getType() == TransactionType.EXPENSE
+                        && t.getCategory() != TransactionCategory.CREDIT_CARD) {
+                    pendingExpenses.add(toSimulatorItemOnDate(t, false, occDate));
+                    totalPendingExpenses = totalPendingExpenses.add(t.getAmount());
+                }
+            }
+        }
 
         // 4. Faturas de cartão que vencem neste mês
         List<Invoice> invoicesDue = isOwner
                 ? invoiceRepository.findDueByFamilyGroupAndDateRange(fg, from, to, unpaidStatuses)
                 : invoiceRepository.findDueByOwnerAndDateRange(user, from, to, unpaidStatuses);
 
-        // 5. Converter para DTO
+        // 5. Converter confirmados para DTO
         List<SimulatorItemResponse> confirmedIncome   = confirmedIncomeRaw.stream().map(t -> toSimulatorItem(t, true)).toList();
         List<SimulatorItemResponse> confirmedExpenses = confirmedExpenseRaw.stream().map(t -> toSimulatorItem(t, true)).toList();
-        List<SimulatorItemResponse> pendingIncome     = pendingIncomeRaw.stream().map(t -> toSimulatorItem(t, false)).toList();
-        List<SimulatorItemResponse> pendingExpenses   = pendingExpenseRaw.stream().map(t -> toSimulatorItem(t, false)).toList();
 
         List<CreditCardDueItem> cardDueItems = invoicesDue.stream()
                 .map(inv -> CreditCardDueItem.builder()
@@ -414,8 +430,6 @@ public class ReportService {
         // 6. Calcular totais
         BigDecimal totalConfirmedIncome   = sumTransactions(confirmedIncomeRaw);
         BigDecimal totalConfirmedExpenses = sumTransactions(confirmedExpenseRaw);
-        BigDecimal totalPendingIncome     = sumTransactions(pendingIncomeRaw);
-        BigDecimal totalPendingExpenses   = sumTransactions(pendingExpenseRaw);
         BigDecimal totalCCDue             = invoicesDue.stream()
                 .map(Invoice::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -471,6 +485,50 @@ public class ReportService {
         return transactions.stream()
                 .map(Transaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Projeta todas as ocorrências de uma transação recorrente que caem dentro de
+     * [monthStart, monthEnd], independente de quão longe no futuro seja o mês-alvo.
+     * Funciona avançando nextOccurrenceDate pela frequência até alcançar o mês.
+     */
+    private List<LocalDate> projectOccurrencesInMonth(Transaction t, LocalDate monthStart, LocalDate monthEnd) {
+        LocalDate next = t.getNextOccurrenceDate();
+        if (next == null || t.getRecurrenceFrequency() == null) return List.of();
+
+        // Avança até a primeira ocorrência >= monthStart
+        while (next.isBefore(monthStart)) {
+            next = advanceByFrequency(next, t.getRecurrenceFrequency());
+        }
+
+        // Coleta todas as ocorrências dentro do mês
+        List<LocalDate> occurrences = new ArrayList<>();
+        while (!next.isAfter(monthEnd)) {
+            occurrences.add(next);
+            next = advanceByFrequency(next, t.getRecurrenceFrequency());
+        }
+        return occurrences;
+    }
+
+    private LocalDate advanceByFrequency(LocalDate date, RecurrenceFrequency freq) {
+        return switch (freq) {
+            case DAILY   -> date.plusDays(1);
+            case WEEKLY  -> date.plusWeeks(1);
+            case MONTHLY -> date.plusMonths(1);
+            case YEARLY  -> date.plusYears(1);
+        };
+    }
+
+    private SimulatorItemResponse toSimulatorItemOnDate(Transaction t, boolean confirmed, LocalDate date) {
+        return SimulatorItemResponse.builder()
+                .description(t.getDescription())
+                .amount(t.getAmount())
+                .type(t.getType())
+                .category(t.getCategory())
+                .date(date)
+                .accountName(t.getAccount() != null ? t.getAccount().getName() : null)
+                .confirmed(confirmed)
+                .build();
     }
 
     private BigDecimal computeVariation(BigDecimal previous, BigDecimal current) {
