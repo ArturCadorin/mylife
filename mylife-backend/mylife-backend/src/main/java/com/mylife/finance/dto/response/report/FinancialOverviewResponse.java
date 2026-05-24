@@ -17,7 +17,9 @@ public class FinancialOverviewResponse {
     private BigDecimal totalInvestments;
     private BigDecimal totalCreditCardDebt;
     private BigDecimal netWorth;
+    private BigDecimal currentMonthIncome;
     private BigDecimal currentMonthExpenses;
+    private BigDecimal currentMonthBalance;
     private List<AccountResponse> accountSummaries;
     private List<SavingsResponse> savingsSummaries;
 }

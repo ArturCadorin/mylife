@@ -329,6 +329,12 @@ public class ReportService {
                                 user, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, monthStart, monthEnd))
                 .add(ccSpending);
 
+        BigDecimal currentMonthIncome = isOwner
+                ? transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME, monthStart, monthEnd)
+                : transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME, monthStart, monthEnd);
+
+        BigDecimal currentMonthBalance = currentMonthIncome.subtract(currentMonthExpenses);
+
         List<AccountResponse> accountSummaries = accounts.stream().map(a -> AccountResponse.builder()
                 .id(a.getId())
                 .name(a.getName())
@@ -363,7 +369,9 @@ public class ReportService {
                 .totalInvestments(totalInvestments)
                 .totalCreditCardDebt(totalCreditCardDebt)
                 .netWorth(netWorth)
+                .currentMonthIncome(currentMonthIncome)
                 .currentMonthExpenses(currentMonthExpenses)
+                .currentMonthBalance(currentMonthBalance)
                 .accountSummaries(accountSummaries)
                 .savingsSummaries(savingsSummaries)
                 .build();

@@ -91,12 +91,16 @@ export default function DashboardPage() {
       shadowColor: 'shadow-rose-300/40 dark:shadow-rose-900/30',
     },
     {
-      title:       'Patrimônio líquido',
-      value:       fmt(overview?.netWorth ?? 0),
-      sub:         'Ativos − Passivos',
+      title:       'Saldo no mês',
+      value:       fmt(overview?.currentMonthBalance ?? 0),
+      sub:         'Receitas − Despesas',
       icon:        TrendingUp,
-      gradient:    'from-emerald-400 to-teal-600',
-      shadowColor: 'shadow-emerald-300/40 dark:shadow-emerald-900/30',
+      gradient:    (overview?.currentMonthBalance ?? 0) >= 0
+                     ? 'from-emerald-400 to-teal-600'
+                     : 'from-rose-400 to-rose-600',
+      shadowColor: (overview?.currentMonthBalance ?? 0) >= 0
+                     ? 'shadow-emerald-300/40 dark:shadow-emerald-900/30'
+                     : 'shadow-rose-300/40 dark:shadow-rose-900/30',
     },
   ] as const;
 
