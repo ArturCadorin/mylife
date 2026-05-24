@@ -18,6 +18,7 @@ import com.mylife.finance.dto.response.AccountResponse;
 import com.mylife.finance.dto.response.SavingsResponse;
 import com.mylife.finance.dto.response.report.*;
 import com.mylife.finance.repository.AccountRepository;
+import com.mylife.finance.repository.CreditCardTransactionRepository;
 import com.mylife.finance.repository.InvestmentRepository;
 import com.mylife.finance.repository.InvoiceRepository;
 import com.mylife.finance.repository.SavingsRepository;
@@ -44,6 +45,7 @@ public class ReportService {
 
     private final TransactionRepository transactionRepository;
     private final InvoiceRepository invoiceRepository;
+    private final CreditCardTransactionRepository creditCardTransactionRepository;
     private final AccountRepository accountRepository;
     private final SavingsRepository savingsRepository;
     private final InvestmentRepository investmentRepository;
@@ -302,13 +304,30 @@ public class ReportService {
 
         BigDecimal netWorth = totalBalance.add(totalSavings).add(totalInvestments).subtract(totalCreditCardDebt);
 
-        // Despesas confirmadas no mês corrente
+        // Despesas do mês corrente = transações EXPENSE + parcelas de cartão na fatura do mês
         LocalDate today = LocalDate.now();
         LocalDate monthStart = today.withDayOfMonth(1);
         LocalDate monthEnd   = today.withDayOfMonth(today.lengthOfMonth());
-        BigDecimal currentMonthExpenses = isOwner
+        YearMonth currentYM  = YearMonth.of(today.getYear(), today.getMonth());
+
+        BigDecimal regularExpenses = isOwner
                 ? transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, monthStart, monthEnd)
                 : transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, monthStart, monthEnd);
+
+        // Parcelas de cartão alocadas na fatura deste mês-calendário (excluindo pagamentos de fatura,
+        // que já estão contabilizados em regularExpenses como categoria CREDIT_CARD)
+        BigDecimal ccSpending = isOwner
+                ? creditCardTransactionRepository.sumByFamilyGroupAndInvoiceMonth(fg, currentYM)
+                : creditCardTransactionRepository.sumByOwnerAndInvoiceMonth(user, currentYM);
+
+        BigDecimal currentMonthExpenses = regularExpenses
+                // Subtrai pagamentos de fatura para evitar dupla contagem
+                .subtract(isOwner
+                        ? transactionRepository.sumByFamilyGroupAndTypeAndCategoryAndDateBetween(
+                                fg, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, monthStart, monthEnd)
+                        : transactionRepository.sumByOwnerAndTypeAndCategoryAndDateBetween(
+                                user, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, monthStart, monthEnd))
+                .add(ccSpending);
 
         List<AccountResponse> accountSummaries = accounts.stream().map(a -> AccountResponse.builder()
                 .id(a.getId())
