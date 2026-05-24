@@ -75,14 +75,6 @@ export default function DashboardPage() {
       shadowColor: 'shadow-sky-300/40 dark:shadow-sky-900/30',
     },
     {
-      title:       'Patrimônio líquido',
-      value:       fmt(overview?.netWorth ?? 0),
-      sub:         'Ativos − Passivos',
-      icon:        TrendingUp,
-      gradient:    'from-emerald-400 to-teal-600',
-      shadowColor: 'shadow-emerald-300/40 dark:shadow-emerald-900/30',
-    },
-    {
       title:       'Cofrinhos',
       value:       fmt(overview?.totalSavings ?? 0),
       sub:         `${overview?.savingsSummaries?.length ?? 0} cofre(s)`,
@@ -97,6 +89,14 @@ export default function DashboardPage() {
       icon:        CreditCard,
       gradient:    'from-rose-400 to-rose-600',
       shadowColor: 'shadow-rose-300/40 dark:shadow-rose-900/30',
+    },
+    {
+      title:       'Patrimônio líquido',
+      value:       fmt(overview?.netWorth ?? 0),
+      sub:         'Ativos − Passivos',
+      icon:        TrendingUp,
+      gradient:    'from-emerald-400 to-teal-600',
+      shadowColor: 'shadow-emerald-300/40 dark:shadow-emerald-900/30',
     },
   ] as const;
 
