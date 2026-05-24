@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart3, Dumbbell, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/use-auth';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { LucideIcon } from 'lucide-react';
 import type { ProductType } from '@/types/api';
@@ -50,7 +49,6 @@ const SOLUTIONS: Solution[] = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SolutionSwitcher() {
-  const { user } = useAuth();
   const { state } = useSidebar();
   const pathname = usePathname();
   const collapsed = state === 'collapsed';
@@ -62,9 +60,6 @@ export function SolutionSwitcher() {
   const currentProduct: ProductType = pathname.startsWith('/fit/') ? 'FITNESS' : 'FINANCE';
   // Finance detectado por /finance/* ou por qualquer rota que não seja /fit/*
 
-  // Mostra todas as soluções do ecossistema — o array products do usuário indica
-  // o que ele já ativou, mas o switcher exibe tudo disponível no ecossistema.
-  const userProducts = new Set(user?.products ?? []);
   const current = SOLUTIONS.find((s) => s.product === currentProduct) ?? SOLUTIONS[0];
   const hasSwitcher = SOLUTIONS.length > 1;
 
@@ -148,7 +143,6 @@ export function SolutionSwitcher() {
                 key={solution.product}
                 solution={solution}
                 isCurrent={solution.product === currentProduct}
-                hasAccess={userProducts.has(solution.product)}
                 onSelect={() => setOpen(false)}
               />
             ))}
@@ -164,12 +158,10 @@ export function SolutionSwitcher() {
 function SolutionCard({
   solution,
   isCurrent,
-  hasAccess,
   onSelect,
 }: {
   solution: Solution;
   isCurrent: boolean;
-  hasAccess: boolean;
   onSelect: () => void;
 }) {
   const inner = (
@@ -178,9 +170,7 @@ function SolutionCard({
         'flex flex-col items-center gap-2.5 rounded-xl p-3 text-center transition-all select-none',
         isCurrent
           ? 'bg-slate-100 dark:bg-white/10 ring-2 ring-emerald-500/30'
-          : hasAccess
-            ? 'hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer'
-            : 'opacity-60 cursor-default',
+          : 'hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer',
       )}
     >
       <div
@@ -202,26 +192,17 @@ function SolutionCard({
         </span>
       </div>
 
-      {isCurrent ? (
+      {isCurrent && (
         <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
           Ativo
         </span>
-      ) : !hasAccess ? (
-        <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-white/8 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-          Em breve
-        </span>
-      ) : null}
+      )}
     </div>
   );
 
   // Current app — no navigation needed
   if (isCurrent) {
     return <div onClick={onSelect}>{inner}</div>;
-  }
-
-  // No access yet — not clickable
-  if (!hasAccess) {
-    return <div>{inner}</div>;
   }
 
   return (
