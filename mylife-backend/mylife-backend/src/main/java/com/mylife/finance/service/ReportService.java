@@ -301,6 +301,14 @@ public class ReportService {
 
         BigDecimal netWorth = totalBalance.add(totalSavings).add(totalInvestments).subtract(totalCreditCardDebt);
 
+        // Despesas confirmadas no mês corrente
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDate monthEnd   = today.withDayOfMonth(today.lengthOfMonth());
+        BigDecimal currentMonthExpenses = isOwner
+                ? transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, monthStart, monthEnd)
+                : transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, monthStart, monthEnd);
+
         List<AccountResponse> accountSummaries = accounts.stream().map(a -> AccountResponse.builder()
                 .id(a.getId())
                 .name(a.getName())
@@ -335,6 +343,7 @@ public class ReportService {
                 .totalInvestments(totalInvestments)
                 .totalCreditCardDebt(totalCreditCardDebt)
                 .netWorth(netWorth)
+                .currentMonthExpenses(currentMonthExpenses)
                 .accountSummaries(accountSummaries)
                 .savingsSummaries(savingsSummaries)
                 .build();

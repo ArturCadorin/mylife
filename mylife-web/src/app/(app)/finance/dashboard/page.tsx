@@ -150,9 +150,10 @@ export default function DashboardPage() {
 
           <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
             {[
-              { label: 'Saldo em contas', value: overview?.totalBalanceAllAccounts ?? 0, cls: '' },
-              { label: 'Cofrinhos',       value: overview?.totalSavings ?? 0,            cls: '' },
-              { label: 'Dívida cartão',   value: overview?.totalCreditCardDebt ?? 0,     cls: 'text-rose-200' },
+              { label: 'Saldo em contas',   value: overview?.totalBalanceAllAccounts ?? 0, cls: '' },
+              { label: 'Cofrinhos',         value: overview?.totalSavings ?? 0,            cls: '' },
+              { label: 'Dívida cartão',     value: overview?.totalCreditCardDebt ?? 0,     cls: 'text-rose-200' },
+              { label: 'Despesas no mês',   value: overview?.currentMonthExpenses ?? 0,    cls: 'text-rose-200' },
             ].map(({ label, value, cls }) => (
               <div key={label}>
                 <p className="text-xs font-semibold text-emerald-200">{label}</p>

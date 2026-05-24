@@ -161,6 +161,7 @@ export interface FinancialOverviewResponse {
   totalInvestments: number;
   totalCreditCardDebt: number;
   netWorth: number;
+  currentMonthExpenses: number;
   accountSummaries: AccountSummary[];
   savingsSummaries: SavingsSummary[];
 }
