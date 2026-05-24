@@ -826,10 +826,16 @@ export interface CategorySummaryResponse {
 }
 
 export interface MonthlyComparisonResponse {
-  currentMonth: MonthlySummaryResponse;
-  previousMonth: MonthlySummaryResponse;
+  currentMonth: string;
+  previousMonth: string;
+  currentIncome: number;
+  previousIncome: number;
   incomeVariation: number;
+  currentExpense: number;
+  previousExpense: number;
   expenseVariation: number;
+  currentBalance: number;
+  previousBalance: number;
   balanceVariation: number;
 }
 
@@ -839,6 +845,7 @@ export interface RecurrenceProjectionResponse {
   type: TransactionType;
   category: TransactionCategory;
   expectedDate: string;
-  recurrenceFrequency: RecurrenceFrequency;
-  accountName: string;
+  recurrenceFrequency: RecurrenceFrequency | null;
+  accountName: string | null;
+  creditCardName: string | null;
 }

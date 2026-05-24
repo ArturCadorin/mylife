@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CreditCard } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,8 +89,8 @@ function MonthlySummaryTab() {
   }
 
   const maxBar = comparison
-    ? Math.max(comparison.currentMonth.totalIncome, comparison.currentMonth.totalExpense,
-               comparison.previousMonth.totalIncome, comparison.previousMonth.totalExpense, 1)
+    ? Math.max(comparison.currentIncome, comparison.currentExpense,
+               comparison.previousIncome, comparison.previousExpense, 1)
     : 1;
 
   function getSheets(): ExcelSheet[] {
@@ -112,10 +112,10 @@ function MonthlySummaryTab() {
     if (comparison) {
       rows.push([]);
       rows.push(['Comparativo', 'Valor (R$)']);
-      rows.push(['Receitas (mês atual)', comparison.currentMonth.totalIncome]);
-      rows.push(['Receitas (mês anterior)', comparison.previousMonth.totalIncome]);
-      rows.push(['Despesas (mês atual)', comparison.currentMonth.totalExpense]);
-      rows.push(['Despesas (mês anterior)', comparison.previousMonth.totalExpense]);
+      rows.push(['Receitas (mês atual)', comparison.currentIncome]);
+      rows.push(['Receitas (mês anterior)', comparison.previousIncome]);
+      rows.push(['Despesas (mês atual)', comparison.currentExpense]);
+      rows.push(['Despesas (mês anterior)', comparison.previousExpense]);
     }
     return [{ name: 'Resumo Mensal', rows }];
   }
@@ -175,10 +175,10 @@ function MonthlySummaryTab() {
               <h3 className="text-sm font-semibold text-slate-700">Comparativo — atual vs mês anterior</h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Receitas (atual)',    value: comparison.currentMonth.totalIncome,    color: 'bg-emerald-500' },
-                  { label: 'Receitas (anterior)', value: comparison.previousMonth.totalIncome,   color: 'bg-emerald-200' },
-                  { label: 'Despesas (atual)',    value: comparison.currentMonth.totalExpense,   color: 'bg-rose-500' },
-                  { label: 'Despesas (anterior)', value: comparison.previousMonth.totalExpense,  color: 'bg-rose-200' },
+                  { label: 'Receitas (atual)',    value: comparison.currentIncome,   color: 'bg-emerald-500' },
+                  { label: 'Receitas (anterior)', value: comparison.previousIncome,  color: 'bg-emerald-200' },
+                  { label: 'Despesas (atual)',    value: comparison.currentExpense,  color: 'bg-rose-500' },
+                  { label: 'Despesas (anterior)', value: comparison.previousExpense, color: 'bg-rose-200' },
                 ].map((bar) => (
                   <div key={bar.label} className="space-y-1">
                     <div className="flex justify-between text-xs text-slate-500">
@@ -361,8 +361,8 @@ function ProjectionTab() {
       ...items.map((item) => [
         item.expectedDate,
         item.description,
-        item.accountName,
-        RECURRENCE_FREQUENCY_LABELS[item.recurrenceFrequency],
+        item.creditCardName ? `Cartão: ${item.creditCardName}` : (item.accountName ?? ''),
+        item.creditCardName ? 'Fatura' : (item.recurrenceFrequency ? RECURRENCE_FREQUENCY_LABELS[item.recurrenceFrequency] : ''),
         item.type === 'INCOME' ? 'Receita' : 'Despesa',
         item.amount,
       ]),
@@ -434,10 +434,21 @@ function ProjectionTab() {
                   <div className="rounded-xl border bg-white divide-y">
                     {dateItems.map((item, i) => (
                       <div key={i} className="flex items-center gap-3 px-4 py-3">
+                        {item.creditCardName ? (
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                            <CreditCard className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                          </div>
+                        ) : null}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">{item.description}</p>
                           <p className="text-xs text-slate-400">
-                            {item.accountName} · {RECURRENCE_FREQUENCY_LABELS[item.recurrenceFrequency]}
+                            {item.creditCardName
+                              ? <span className="inline-flex items-center gap-1">
+                                  <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-600">Fatura</span>
+                                  {item.creditCardName}
+                                </span>
+                              : <>{item.accountName} · {item.recurrenceFrequency ? RECURRENCE_FREQUENCY_LABELS[item.recurrenceFrequency] : ''}</>
+                            }
                           </p>
                         </div>
                         <p className={`text-sm font-semibold shrink-0 ${item.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>

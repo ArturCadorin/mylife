@@ -20,4 +20,6 @@ public class RecurrenceProjectionResponse {
     private LocalDate expectedDate;
     private RecurrenceFrequency recurrenceFrequency;
     private String accountName;
+    /** Preenchido apenas para faturas de cartão de crédito (null para recorrências normais) */
+    private String creditCardName;
 }

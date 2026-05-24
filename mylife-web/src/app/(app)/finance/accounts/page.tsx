@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Building2, Wallet, Pencil, PowerOff, Trash2, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Building2, Wallet, Pencil, PowerOff, Trash2, Loader2, PiggyBank } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AccountSheet } from '@/components/accounts/account-sheet';
-import { useAccounts, useDeactivateAccount, useDeleteAccount } from '@/hooks/use-finance';
-import { ACCOUNT_TYPE_LABELS, type AccountResponse } from '@/types/api';
+import { useAccounts, useDeactivateAccount, useDeleteAccount, useSavings } from '@/hooks/use-finance';
+import { ACCOUNT_TYPE_LABELS, type AccountResponse, type SavingsResponse } from '@/types/api';
 import { getBankColor } from '@/lib/banks';
 
 function formatCurrency(value: number) {
@@ -112,6 +112,7 @@ function BankCard({ account, onEdit, onDeactivate, onDelete, actionLoading }: Ba
 
 export default function AccountsPage() {
   const { data: accounts = [], isLoading } = useAccounts();
+  const { data: savings = [], isLoading: savingsLoading } = useSavings();
   const deactivateMutation = useDeactivateAccount();
   const deleteMutation = useDeleteAccount();
 
@@ -124,6 +125,24 @@ export default function AccountsPage() {
   const activeAccounts   = accounts.filter((a) => a.active);
   const inactiveAccounts = accounts.filter((a) => !a.active);
   const totalBalance     = activeAccounts.reduce((sum, a) => sum + a.balance, 0);
+  const totalSavings     = savings.reduce((sum, s) => sum + s.currentAmount, 0);
+
+  /* Group savings by linked account */
+  const savingsGroups = useMemo(() => {
+    const map = new Map<number | null, { accountId: number | null; accountName: string | null; items: SavingsResponse[] }>();
+    for (const s of savings) {
+      const key = s.linkedAccountId ?? null;
+      if (!map.has(key)) {
+        map.set(key, { accountId: key, accountName: s.linkedAccountName, items: [] });
+      }
+      map.get(key)!.items.push(s);
+    }
+    return [...map.values()].sort((a, b) => {
+      if (a.accountId === null) return 1;
+      if (b.accountId === null) return -1;
+      return (a.accountName ?? '').localeCompare(b.accountName ?? '');
+    });
+  }, [savings]);
 
   function openCreate() { setEditingAccount(undefined); setSheetOpen(true); }
   function openEdit(acc: AccountResponse) { setEditingAccount(acc); setSheetOpen(true); }
@@ -160,7 +179,7 @@ export default function AccountsPage() {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-4">
         <Card className="shadow-sm sm:col-span-2">
           <CardContent className="flex items-center gap-4 pb-4 pt-5">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50">
@@ -184,6 +203,23 @@ export default function AccountsPage() {
               ? <Skeleton className="h-8 w-12" />
               : <p className="text-3xl font-bold text-slate-900">{activeAccounts.length}</p>}
             <p className="mt-1 text-xs text-slate-400">{accounts.length} no total</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="flex items-center gap-3 pb-4 pt-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-500/15">
+              <PiggyBank className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-slate-400">Total cofrinhos</p>
+              {savingsLoading
+                ? <Skeleton className="h-7 w-24" />
+                : <p className="text-2xl font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                    {formatCurrency(totalSavings)}
+                  </p>}
+              <p className="mt-0.5 text-xs text-slate-400">{savings.length} cofrinho(s)</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -247,6 +283,87 @@ export default function AccountsPage() {
                 onDelete={handleDelete}
                 actionLoading={actionLoading}
               />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Cofrinhos por conta ──────────────────────────────── */}
+      {!savingsLoading && savings.length > 0 && (
+        <>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Cofrinhos por conta</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {savingsGroups.map(({ accountId, accountName, items }) => {
+              const groupTotal = items.reduce((s, i) => s + i.currentAmount, 0);
+              return (
+                <Card key={accountId ?? 'unlinked'} className="shadow-sm">
+                  <CardHeader className="px-5 pb-2 pt-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-500/15">
+                        <PiggyBank className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="truncate text-sm">
+                          {accountName ?? 'Sem conta vinculada'}
+                        </CardTitle>
+                        <p className="text-xs text-slate-400 tabular-nums">{formatCurrency(groupTotal)}</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4 px-5 pb-5">
+                    {items.map((s) => {
+                      const hasTarget = s.targetAmount != null && s.targetAmount > 0;
+                      const pct = hasTarget && s.percentualDaMeta != null
+                        ? Math.min(s.percentualDaMeta, 100)
+                        : null;
+                      return (
+                        <div key={s.id}>
+                          <div className="mb-1 flex items-baseline justify-between">
+                            <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-300">{s.name}</p>
+                            {pct !== null
+                              ? <span className={`ml-2 shrink-0 text-xs font-bold ${pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-violet-500 dark:text-violet-400'}`}>
+                                  {Math.round(pct)}%
+                                </span>
+                              : <span className="ml-2 shrink-0 text-xs italic text-slate-400">sem meta</span>
+                            }
+                          </div>
+                          {hasTarget && (
+                            <div className="mb-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/8">
+                              <div
+                                className="h-1.5 rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all"
+                                style={{ width: `${pct ?? 0}%` }}
+                              />
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500">
+                            {formatCurrency(s.currentAmount)}
+                            {hasTarget && s.targetAmount != null && (
+                              <span className="text-slate-300 dark:text-slate-600"> / {formatCurrency(s.targetAmount)}</span>
+                            )}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {savingsLoading && (
+        <>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Cofrinhos por conta</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Card key={i} className="shadow-sm">
+                <CardContent className="px-5 pb-5 pt-4 space-y-3">
+                  <Skeleton className="h-8 w-40" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </CardContent>
+              </Card>
             ))}
           </div>
         </>

@@ -79,12 +79,16 @@ public class ReportController {
                 "Comparativo mensal obtido com sucesso."));
     }
 
-    @Operation(summary = "Projeção de transações recorrentes futuras")
+    @Operation(summary = "Projeção de transações recorrentes futuras e faturas de cartão")
     @GetMapping("/recurrence-projection")
     public ResponseEntity<ApiResponse<List<RecurrenceProjectionResponse>>> getRecurrenceProjection(
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        LocalDate from = startDate != null ? startDate : LocalDate.now();
+        LocalDate to   = endDate   != null ? endDate   : from.plusDays(30);
         return ResponseEntity.ok(ApiResponse.success(
-                reportService.getRecurrenceProjection(user),
+                reportService.getRecurrenceProjection(user, from, to),
                 "Projeção de recorrências obtida com sucesso."));
     }
 

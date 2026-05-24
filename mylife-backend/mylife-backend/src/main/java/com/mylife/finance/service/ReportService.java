@@ -64,30 +64,35 @@ public class ReportService {
 
         BigDecimal totalIncome;
         BigDecimal totalAllExpense;
-        BigDecimal totalCreditCardSpending;
+        BigDecimal invoicePayments;
+        BigDecimal ccSpending;
 
         if (isOwner) {
             totalIncome = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME, from, to);
             totalAllExpense = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, from, to);
-            totalCreditCardSpending = transactionRepository.sumByFamilyGroupAndTypeAndCategoryAndDateBetween(
+            invoicePayments = transactionRepository.sumByFamilyGroupAndTypeAndCategoryAndDateBetween(
                     fg, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, from, to);
+            ccSpending = creditCardTransactionRepository.sumByFamilyGroupAndInvoiceMonth(fg, ym);
         } else {
             totalIncome = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME, from, to);
             totalAllExpense = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, from, to);
-            totalCreditCardSpending = transactionRepository.sumByOwnerAndTypeAndCategoryAndDateBetween(
+            invoicePayments = transactionRepository.sumByOwnerAndTypeAndCategoryAndDateBetween(
                     user, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, from, to);
+            ccSpending = creditCardTransactionRepository.sumByOwnerAndInvoiceMonth(user, ym);
         }
 
-        BigDecimal totalExpense = totalAllExpense.subtract(totalCreditCardSpending);
+        // Despesas reais = gastos em dinheiro + gastos no cartão do mês
+        BigDecimal regularExpenses = totalAllExpense.subtract(invoicePayments);
+        BigDecimal totalExpense = regularExpenses.add(ccSpending);
         BigDecimal balance = totalIncome.subtract(totalExpense);
-        BigDecimal netBalance = balance.subtract(totalCreditCardSpending);
+        BigDecimal netBalance = balance;
 
         return MonthlySummaryResponse.builder()
                 .referenceMonth(yearMonthStr)
                 .totalIncome(totalIncome)
                 .totalExpense(totalExpense)
                 .balance(balance)
-                .totalCreditCardSpending(totalCreditCardSpending)
+                .totalCreditCardSpending(ccSpending)
                 .netBalance(netBalance)
                 .build();
     }
@@ -214,19 +219,31 @@ public class ReportService {
         LocalDate cFrom = current.atDay(1), cTo = current.atEndOfMonth();
         LocalDate pFrom = previous.atDay(1), pTo = previous.atEndOfMonth();
 
-        BigDecimal currIncome, prevIncome, currExpense, prevExpense;
+        BigDecimal currIncome, prevIncome, currAllExpense, prevAllExpense;
+        BigDecimal currInvoicePay, prevInvoicePay, currCcSpend, prevCcSpend;
 
         if (isOwner) {
-            currIncome  = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME,  cFrom, cTo);
-            prevIncome  = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME,  pFrom, pTo);
-            currExpense = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, cFrom, cTo);
-            prevExpense = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, pFrom, pTo);
+            currIncome      = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME,  cFrom, cTo);
+            prevIncome      = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.INCOME,  pFrom, pTo);
+            currAllExpense  = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, cFrom, cTo);
+            prevAllExpense  = transactionRepository.sumByFamilyGroupAndTypeAndDateBetween(fg, TransactionType.EXPENSE, pFrom, pTo);
+            currInvoicePay  = transactionRepository.sumByFamilyGroupAndTypeAndCategoryAndDateBetween(fg, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, cFrom, cTo);
+            prevInvoicePay  = transactionRepository.sumByFamilyGroupAndTypeAndCategoryAndDateBetween(fg, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, pFrom, pTo);
+            currCcSpend     = creditCardTransactionRepository.sumByFamilyGroupAndInvoiceMonth(fg, current);
+            prevCcSpend     = creditCardTransactionRepository.sumByFamilyGroupAndInvoiceMonth(fg, previous);
         } else {
-            currIncome  = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME,  cFrom, cTo);
-            prevIncome  = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME,  pFrom, pTo);
-            currExpense = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, cFrom, cTo);
-            prevExpense = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, pFrom, pTo);
+            currIncome      = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME,  cFrom, cTo);
+            prevIncome      = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.INCOME,  pFrom, pTo);
+            currAllExpense  = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, cFrom, cTo);
+            prevAllExpense  = transactionRepository.sumByOwnerAndTypeAndDateBetween(user, TransactionType.EXPENSE, pFrom, pTo);
+            currInvoicePay  = transactionRepository.sumByOwnerAndTypeAndCategoryAndDateBetween(user, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, cFrom, cTo);
+            prevInvoicePay  = transactionRepository.sumByOwnerAndTypeAndCategoryAndDateBetween(user, TransactionType.EXPENSE, TransactionCategory.CREDIT_CARD, pFrom, pTo);
+            currCcSpend     = creditCardTransactionRepository.sumByOwnerAndInvoiceMonth(user, current);
+            prevCcSpend     = creditCardTransactionRepository.sumByOwnerAndInvoiceMonth(user, previous);
         }
+
+        BigDecimal currExpense = currAllExpense.subtract(currInvoicePay).add(currCcSpend);
+        BigDecimal prevExpense = prevAllExpense.subtract(prevInvoicePay).add(prevCcSpend);
 
         BigDecimal currBalance = currIncome.subtract(currExpense);
         BigDecimal prevBalance = prevIncome.subtract(prevExpense);
@@ -248,26 +265,61 @@ public class ReportService {
 
     // ── Recurrence projection ──────────────────────────────────────────────────
 
-    public List<RecurrenceProjectionResponse> getRecurrenceProjection(User authenticatedUser) {
+    public List<RecurrenceProjectionResponse> getRecurrenceProjection(User authenticatedUser,
+                                                                       LocalDate from, LocalDate to) {
         User user = reloadUser(authenticatedUser);
         FamilyGroup fg = requireFamilyGroup(user);
         boolean isOwner = user.getRole() == Role.OWNER;
 
         List<RecurrenceType> activeTypes = List.of(RecurrenceType.AUTOMATIC, RecurrenceType.MANUAL);
 
+        // ── 1. Recorrências regulares projetadas no período ────────────────────
         List<Transaction> recurrences = isOwner
                 ? transactionRepository.findActiveRecurrencesByFamilyGroup(fg, activeTypes)
                 : transactionRepository.findActiveRecurrencesByOwner(user, activeTypes);
 
-        return recurrences.stream().map(t -> RecurrenceProjectionResponse.builder()
-                .description(t.getDescription())
-                .amount(t.getAmount())
-                .type(t.getType())
-                .category(t.getCategory())
-                .expectedDate(t.getNextOccurrenceDate())
-                .recurrenceFrequency(t.getRecurrenceFrequency())
-                .accountName(t.getAccount().getName())
-                .build()).toList();
+        List<RecurrenceProjectionResponse> result = new ArrayList<>();
+
+        for (Transaction t : recurrences) {
+            List<LocalDate> occurrences = projectOccurrencesInMonth(t, from, to);
+            for (LocalDate date : occurrences) {
+                result.add(RecurrenceProjectionResponse.builder()
+                        .description(t.getDescription())
+                        .amount(t.getAmount())
+                        .type(t.getType())
+                        .category(t.getCategory())
+                        .expectedDate(date)
+                        .recurrenceFrequency(t.getRecurrenceFrequency())
+                        .accountName(t.getAccount().getName())
+                        .creditCardName(null)
+                        .build());
+            }
+        }
+
+        // ── 2. Faturas de cartão abertas com vencimento no período ─────────────
+        List<InvoiceStatus> unpaidStatuses = List.of(InvoiceStatus.OPEN, InvoiceStatus.CLOSED);
+        List<Invoice> invoices = isOwner
+                ? invoiceRepository.findDueByFamilyGroupAndDateRange(fg, from, to, unpaidStatuses)
+                : invoiceRepository.findDueByOwnerAndDateRange(user, from, to, unpaidStatuses);
+
+        for (Invoice inv : invoices) {
+            if (inv.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
+            String cardName = inv.getCreditCard().getName();
+            result.add(RecurrenceProjectionResponse.builder()
+                    .description("Fatura " + cardName)
+                    .amount(inv.getTotalAmount())
+                    .type(TransactionType.EXPENSE)
+                    .category(TransactionCategory.CREDIT_CARD)
+                    .expectedDate(inv.getDueDate())
+                    .recurrenceFrequency(null)
+                    .accountName(null)
+                    .creditCardName(cardName)
+                    .build());
+        }
+
+        // ordenar por data
+        result.sort(Comparator.comparing(RecurrenceProjectionResponse::getExpectedDate));
+        return result;
     }
 
     // ── Financial overview ─────────────────────────────────────────────────────
