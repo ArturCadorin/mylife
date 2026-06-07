@@ -26,8 +26,8 @@ const schema = z.object({
   bankName:       z.string().min(1, 'Informe o banco').max(100),
   lastFourDigits: z.string().regex(/^\d{4}$/, 'Informe os 4 últimos dígitos'),
   limit:          z.coerce.number().min(1, 'Limite deve ser maior que zero'),
-  closingDay:     z.coerce.number().min(1).max(28),
-  dueDay:         z.coerce.number().min(1).max(28),
+  closingDay:     z.coerce.number().min(1).max(31),
+  dueDay:         z.coerce.number().min(1).max(31),
   network:        z.enum(['visa', 'mastercard', 'elo', 'amex', 'hipercard', 'other']),
   color:          z.string().optional(),
 });
@@ -204,12 +204,12 @@ export function CardSheet({ open, onOpenChange, card }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <FieldLabel>Dia fechamento</FieldLabel>
-          <SheetInput id="closingDay" type="number" min="1" max="28" placeholder="1–28" {...register('closingDay')} />
+          <SheetInput id="closingDay" type="number" min="1" max="31" placeholder="1–31" {...register('closingDay')} />
           {errors.closingDay && <p className="text-xs text-red-500">{errors.closingDay.message}</p>}
         </div>
         <div className="space-y-1.5">
           <FieldLabel>Dia vencimento</FieldLabel>
-          <SheetInput id="dueDay" type="number" min="1" max="28" placeholder="1–28" {...register('dueDay')} />
+          <SheetInput id="dueDay" type="number" min="1" max="31" placeholder="1–31" {...register('dueDay')} />
           {errors.dueDay && <p className="text-xs text-red-500">{errors.dueDay.message}</p>}
         </div>
       </div>
