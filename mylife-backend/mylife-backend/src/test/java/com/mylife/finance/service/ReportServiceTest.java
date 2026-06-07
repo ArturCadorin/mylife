@@ -258,7 +258,9 @@ class ReportServiceTest {
                 eq(familyGroup), anyList()))
                 .thenReturn(List.of(recurring));
 
-        List<RecurrenceProjectionResponse> result = reportService.getRecurrenceProjection(owner);
+        LocalDate from = LocalDate.of(2026, 6, 1);
+        LocalDate to   = LocalDate.of(2026, 6, 30);
+        List<RecurrenceProjectionResponse> result = reportService.getRecurrenceProjection(owner, from, to);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDescription()).isEqualTo("Aluguel");

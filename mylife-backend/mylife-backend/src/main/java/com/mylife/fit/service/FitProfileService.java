@@ -19,7 +19,7 @@ public class FitProfileService {
     private final FitProfileRepository fitProfileRepository;
     private final UserRepository userRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public FitProfileResponse getOrCreate(User authenticatedUser) {
         User user = reloadUser(authenticatedUser);
         FitProfile profile = fitProfileRepository.findByUser(user)
