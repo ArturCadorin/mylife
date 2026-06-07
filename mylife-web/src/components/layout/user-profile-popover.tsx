@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useFitProfile } from '@/hooks/use-fit';
 import { ACTIVITY_LEVEL_LABELS, BIOLOGICAL_SEX_LABELS } from '@/types/api';
 import { cn } from '@/lib/utils';
+import { ProfileEditSheet } from '@/components/layout/profile-edit-sheet';
 
 function fmtDate(d: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -23,20 +24,20 @@ function useSolutionTheme(pathname: string) {
   const isFit = pathname.startsWith('/fit/');
   return isFit
     ? {
-        gradient:   'from-orange-500 to-red-500',
-        ring:       'ring-orange-500/30',
-        subText:    'text-orange-100',
-        editLink:   'text-orange-600 dark:text-orange-400',
-        footerHover:'hover:text-orange-600 dark:hover:text-orange-400',
-        avatarRing: 'ring-orange-500/30',
+        gradient:    'from-orange-500 to-red-500',
+        ring:        'ring-orange-500/30',
+        subText:     'text-orange-100',
+        editBtn:     'text-orange-600 dark:text-orange-400',
+        footerHover: 'hover:text-orange-600 dark:hover:text-orange-400',
+        avatarRing:  'ring-orange-500/30',
       }
     : {
-        gradient:   'from-emerald-500 to-teal-500',
-        ring:       'ring-emerald-500/30',
-        subText:    'text-emerald-100',
-        editLink:   'text-emerald-600 dark:text-emerald-400',
-        footerHover:'hover:text-emerald-600 dark:hover:text-emerald-400',
-        avatarRing: 'ring-emerald-500/30',
+        gradient:    'from-emerald-500 to-teal-500',
+        ring:        'ring-emerald-500/30',
+        subText:     'text-emerald-100',
+        editBtn:     'text-emerald-600 dark:text-emerald-400',
+        footerHover: 'hover:text-emerald-600 dark:hover:text-emerald-400',
+        avatarRing:  'ring-emerald-500/30',
       };
 }
 
@@ -48,12 +49,19 @@ export function UserProfilePopover() {
   const { data: profile, isLoading } = useFitProfile();
   const theme = useSolutionTheme(pathname);
 
-  const [open, setOpen] = useState(false);
-  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
+  const [open, setOpen]                   = useState(false);
+  const [sheetOpen, setSheetOpen]         = useState(false);
+  const [panelPos, setPanelPos]           = useState({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef   = useRef<HTMLDivElement>(null);
 
   const initial = user?.name?.charAt(0).toUpperCase() ?? 'U';
+
+  /* Abre o sheet de edição (fecha o popover primeiro) */
+  function openEdit() {
+    setOpen(false);
+    setSheetOpen(true);
+  }
 
   /* Calcula posição do painel relativo ao viewport */
   const calcPos = useCallback(() => {
@@ -65,7 +73,6 @@ export function UserProfilePopover() {
     });
   }, []);
 
-  /* Abre/fecha */
   function toggle() {
     if (!open) calcPos();
     setOpen((v) => !v);
@@ -97,10 +104,10 @@ export function UserProfilePopover() {
   }, [open, calcPos]);
 
   const rows = [
-    { Icon: Calendar, label: 'Data de nascimento', value: profile?.birthDate ? fmtDate(profile.birthDate) : null },
-    { Icon: User,     label: 'Idade',               value: profile?.age           ? `${profile.age} anos`                         : null },
-    { Icon: Venus,    label: 'Sexo biológico',       value: profile?.biologicalSex ? BIOLOGICAL_SEX_LABELS[profile.biologicalSex]  : null },
-    { Icon: Activity, label: 'Nível de atividade',   value: profile?.activityLevel ? ACTIVITY_LEVEL_LABELS[profile.activityLevel]  : null },
+    { Icon: Calendar, label: 'Data de nascimento', value: profile?.birthDate    ? fmtDate(profile.birthDate)                        : null },
+    { Icon: User,     label: 'Idade',               value: profile?.age          ? `${profile.age} anos`                             : null },
+    { Icon: Venus,    label: 'Sexo biológico',       value: profile?.biologicalSex ? BIOLOGICAL_SEX_LABELS[profile.biologicalSex]    : null },
+    { Icon: Activity, label: 'Nível de atividade',   value: profile?.activityLevel ? ACTIVITY_LEVEL_LABELS[profile.activityLevel]   : null },
   ];
   const hasProfile = rows.some((r) => r.value);
 
@@ -118,7 +125,7 @@ export function UserProfilePopover() {
       {/* Header colorido */}
       <div className={cn('bg-gradient-to-br px-5 py-4', theme.gradient)}>
         <div className="flex items-center gap-3">
-          <Avatar className={cn('h-10 w-10 ring-2 ring-white/30')}>
+          <Avatar className="h-10 w-10 ring-2 ring-white/30">
             <AvatarFallback className="bg-white/20 text-white font-bold text-base">
               {initial}
             </AvatarFallback>
@@ -136,14 +143,13 @@ export function UserProfilePopover() {
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
             Dados pessoais
           </p>
-          <Link
-            href="/fit/profile"
-            onClick={() => setOpen(false)}
-            className={cn('flex items-center gap-1 text-[10px] font-semibold hover:underline', theme.editLink)}
+          <button
+            onClick={openEdit}
+            className={cn('flex items-center gap-1 text-[10px] font-semibold hover:underline', theme.editBtn)}
           >
             <Pencil className="h-2.5 w-2.5" />
             Editar
-          </Link>
+          </button>
         </div>
 
         <div className="space-y-1">
@@ -161,13 +167,12 @@ export function UserProfilePopover() {
                 <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
                   Perfil físico não preenchido
                 </p>
-                <Link
-                  href="/fit/profile"
-                  onClick={() => setOpen(false)}
-                  className={cn('mt-2 inline-flex items-center gap-1 text-xs font-semibold hover:underline', theme.editLink)}
+                <button
+                  onClick={openEdit}
+                  className={cn('mt-2 inline-flex items-center gap-1 text-xs font-semibold hover:underline', theme.editBtn)}
                 >
                   Completar perfil <ArrowRight className="h-3 w-3" />
-                </Link>
+                </button>
               </div>
             )
             : rows.map(({ Icon, label, value }) => value ? (
@@ -221,6 +226,9 @@ export function UserProfilePopover() {
       </button>
 
       {panel}
+
+      {/* Sheet de edição — abre sobre qualquer página, sem navegar */}
+      <ProfileEditSheet open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
   );
 }
